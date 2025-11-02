@@ -1,41 +1,63 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Node modules
 node_modules/
 
-# Expo
+# Expo specific
 .expo/
+.expo-shared/
 dist/
 web-build/
-expo-env.d.ts
+build/
+web-report/
+ios/
+android/
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+# Mac system files
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
 
-# typescript
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+expo-debug.log
+debug.log
+
+# Cache
+.expo/
+.expo-shared/
+cache/
+.tmp/
+temp/
+*.tmp
+
+# IDE/editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# TypeScript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# OS generated files
+Thumbs.db
+*.log
+
+# Optional: prevent build artifacts from versioning
+*.apk
+*.aab
+*.ipa
+
+# React Native CLI cache
+metro-cache/

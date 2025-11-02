@@ -1,12 +1,11 @@
 {
   "expo": {
-    "name": "MilkProject_FE2",
-    "slug": "MilkProject_FE2",
+    "name": "MilkSeller App",
+    "slug": "milkseller_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -25,6 +24,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": ["expo-font"]
   }
 }
