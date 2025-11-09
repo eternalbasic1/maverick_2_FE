@@ -1,15 +1,70 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { COLORS, TYPOGRAPHY, SPACING } from "../../theme/colors";
+import { adminService } from "../../services/admin";
+import { DeliverySchedule } from "../../types/api";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { formatDate, formatLiters } from "../../utils/formatting";
 
 export const AdminDashboardScreen: React.FC = () => {
+  const [schedule, setSchedule] = useState<DeliverySchedule | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadTodaySchedule = async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const scheduleData = await adminService.getDeliverySchedule(today);
+      setSchedule(scheduleData);
+    } catch (error: any) {
+      console.error("Error loading schedule:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTodaySchedule();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadTodaySchedule();
+  };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading dashboard..." />;
+  }
+
+  const deliveredCount =
+    schedule?.deliveries.filter((d) => d.status === "delivered").length || 0;
+  const failedCount =
+    schedule?.deliveries.filter((d) => d.status === "failed").length || 0;
+  const scheduledCount =
+    schedule?.deliveries.filter((d) => d.status === "scheduled").length || 0;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Admin Dashboard</Text>
-        <Text style={styles.subtitle}>Today's delivery overview</Text>
+        <Text style={styles.subtitle}>
+          Today's delivery overview - {formatDate(new Date(), "MMMM dd, yyyy")}
+        </Text>
       </View>
 
       <GlassCard style={styles.statsCard}>
@@ -17,13 +72,17 @@ export const AdminDashboardScreen: React.FC = () => {
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
             <Ionicons name="water" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>125</Text>
+            <Text style={styles.statValue}>
+              {schedule ? formatLiters(schedule.total_liters) : "0 L"}
+            </Text>
             <Text style={styles.statLabel}>Total Liters</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="people" size={24} color={COLORS.secondary} />
-            <Text style={styles.statValue}>50</Text>
-            <Text style={styles.statLabel}>Deliveries</Text>
+            <Text style={styles.statValue}>
+              {schedule?.total_deliveries || 0}
+            </Text>
+            <Text style={styles.statLabel}>Total Deliveries</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons
@@ -31,22 +90,24 @@ export const AdminDashboardScreen: React.FC = () => {
               size={24}
               color={COLORS.success}
             />
-            <Text style={styles.statValue}>45</Text>
+            <Text style={styles.statValue}>{deliveredCount}</Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="close-circle" size={24} color={COLORS.error} />
-            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statValue}>{failedCount}</Text>
             <Text style={styles.statLabel}>Failed</Text>
           </View>
         </View>
       </GlassCard>
 
       <GlassCard style={styles.pendingCard}>
-        <Text style={styles.cardTitle}>Pending Actions</Text>
+        <Text style={styles.cardTitle}>Delivery Status</Text>
         <View style={styles.pendingItem}>
-          <Ionicons name="calendar-outline" size={20} color={COLORS.warning} />
-          <Text style={styles.pendingText}>3 Skip Requests Pending</Text>
+          <Ionicons name="time-outline" size={20} color={COLORS.warning} />
+          <Text style={styles.pendingText}>
+            {scheduledCount} Deliveries Scheduled
+          </Text>
           <Ionicons
             name="chevron-forward"
             size={16}
@@ -54,8 +115,14 @@ export const AdminDashboardScreen: React.FC = () => {
           />
         </View>
         <View style={styles.pendingItem}>
-          <Ionicons name="time-outline" size={20} color={COLORS.info} />
-          <Text style={styles.pendingText}>5 Deliveries In Progress</Text>
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={20}
+            color={COLORS.success}
+          />
+          <Text style={styles.pendingText}>
+            {deliveredCount} Deliveries Completed
+          </Text>
           <Ionicons
             name="chevron-forward"
             size={16}
@@ -68,7 +135,9 @@ export const AdminDashboardScreen: React.FC = () => {
             size={20}
             color={COLORS.error}
           />
-          <Text style={styles.pendingText}>2 Failed Deliveries</Text>
+          <Text style={styles.pendingText}>
+            {failedCount} Failed Deliveries
+          </Text>
           <Ionicons
             name="chevron-forward"
             size={16}
@@ -77,42 +146,55 @@ export const AdminDashboardScreen: React.FC = () => {
         </View>
       </GlassCard>
 
-      <GlassCard style={styles.recentCard}>
-        <Text style={styles.cardTitle}>Recent Activity</Text>
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <Ionicons name="checkmark" size={16} color={COLORS.success} />
-          </View>
-          <View style={styles.activityContent}>
-            <Text style={styles.activityText}>
-              Delivery completed for John Doe
-            </Text>
-            <Text style={styles.activityTime}>2 minutes ago</Text>
-          </View>
-        </View>
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <Ionicons name="calendar" size={16} color={COLORS.warning} />
-          </View>
-          <View style={styles.activityContent}>
-            <Text style={styles.activityText}>
-              Skip request from Jane Smith
-            </Text>
-            <Text style={styles.activityTime}>15 minutes ago</Text>
-          </View>
-        </View>
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <Ionicons name="close" size={16} color={COLORS.error} />
-          </View>
-          <View style={styles.activityContent}>
-            <Text style={styles.activityText}>
-              Delivery failed for Mike Johnson
-            </Text>
-            <Text style={styles.activityTime}>1 hour ago</Text>
-          </View>
-        </View>
-      </GlassCard>
+      {schedule && schedule.deliveries.length > 0 && (
+        <GlassCard style={styles.recentCard}>
+          <Text style={styles.cardTitle}>Recent Deliveries</Text>
+          {schedule.deliveries.slice(0, 5).map((delivery, index) => (
+            <View key={delivery.user_id + index} style={styles.activityItem}>
+              <View
+                style={[
+                  styles.activityIcon,
+                  {
+                    backgroundColor:
+                      delivery.status === "delivered"
+                        ? COLORS.success + "20"
+                        : delivery.status === "failed"
+                        ? COLORS.error + "20"
+                        : COLORS.warning + "20",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    delivery.status === "delivered"
+                      ? "checkmark"
+                      : delivery.status === "failed"
+                      ? "close"
+                      : "time"
+                  }
+                  size={16}
+                  color={
+                    delivery.status === "delivered"
+                      ? COLORS.success
+                      : delivery.status === "failed"
+                      ? COLORS.error
+                      : COLORS.warning
+                  }
+                />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>
+                  {delivery.user_name} -{" "}
+                  {formatLiters(delivery.scheduled_liters)}
+                </Text>
+                <Text style={styles.activityTime}>
+                  Status: {delivery.status}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </GlassCard>
+      )}
     </ScrollView>
   );
 };
@@ -199,7 +281,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: COLORS.surfaceVariant,
     justifyContent: "center",
     alignItems: "center",
     marginRight: SPACING.md,

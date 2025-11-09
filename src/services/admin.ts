@@ -4,6 +4,7 @@ import {
   AdminSkipRequest,
   BillingReport,
   UpdateDeliveryStatusData,
+  AllCustomersResponse,
 } from "../types/api";
 
 export const adminService = {
@@ -50,6 +51,12 @@ export const adminService = {
   // Get all users
   getAllUsers: async (): Promise<any[]> => {
     const response = await api.get("/admin/users/");
+    return response.data;
+  },
+
+  // Get all customers
+  getAllCustomers: async (): Promise<AllCustomersResponse> => {
+    const response = await api.get("/admin/allcustomers");
     return response.data;
   },
 

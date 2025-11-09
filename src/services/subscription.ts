@@ -1,6 +1,7 @@
 import api from "./api";
 import {
   Subscription,
+  Rate,
   BillingHistory,
   CreateSubscriptionData,
   UpdateRateData,
@@ -8,9 +9,24 @@ import {
 
 export const subscriptionService = {
   // Get current subscription
-  getSubscription: async (): Promise<Subscription> => {
-    const response = await api.get("/subscription/");
-    return response.data;
+  getSubscription: async (): Promise<Subscription | null> => {
+    try {
+      const response = await api.get("/subscription/");
+      // Check if response is error message
+      if (
+        response.data.message &&
+        response.data.message.includes("No active subscription")
+      ) {
+        return null;
+      }
+      return response.data as Subscription;
+    } catch (error: any) {
+      // Handle 404 or other errors
+      if (error.response?.data?.message) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   // Create new subscription
@@ -30,7 +46,7 @@ export const subscriptionService = {
     data: UpdateRateData
   ): Promise<{
     message: string;
-    new_rate: any;
+    new_rate: Rate;
     effective_from: string;
   }> => {
     const response = await api.post("/subscription/update-rate/", data);

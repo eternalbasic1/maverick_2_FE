@@ -1,56 +1,153 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  RefreshControl,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { useAuthContext } from "../../context/AuthContext";
 import { COLORS, TYPOGRAPHY, SPACING } from "../../theme/colors";
+import { subscriptionService } from "../../services/subscription";
+import { Subscription } from "../../types/api";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { EmptyState } from "../../components/common/EmptyState";
+import { formatDate, formatLiters } from "../../utils/formatting";
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuthContext();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  console.log("🔍 user", user);
+  console.log("🔍 subscription", subscription);
+  const loadSubscription = async () => {
+    try {
+      const sub = await subscriptionService.getSubscription();
+      setSubscription(sub);
+    } catch (error: any) {
+      console.error("Error loading subscription:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to load subscription data"
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSubscription();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadSubscription();
+  };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading subscription..." />;
+  }
+
+  const dailyLiters = subscription?.current_rate || "0";
+  const subscriptionDays = subscription
+    ? Math.floor(
+        (new Date().getTime() -
+          new Date(subscription.subscription_start_date).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : 0;
+
+  // Calculate upcoming delivery date (tomorrow)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const upcomingDeliveryDate = formatDate(tomorrow, "EEEE, MMMM dd");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello, {user?.full_name}!</Text>
         <Text style={styles.subtitle}>Here's your milk delivery overview</Text>
       </View>
 
-      <GlassCard style={styles.quickStatsCard}>
-        <Text style={styles.cardTitle}>Quick Stats</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="water" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>2.5L</Text>
-            <Text style={styles.statLabel}>Daily</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="calendar" size={24} color={COLORS.secondary} />
-            <Text style={styles.statValue}>28</Text>
-            <Text style={styles.statLabel}>Days</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons
-              name="checkmark-circle"
-              size={24}
-              color={COLORS.success}
-            />
-            <Text style={styles.statValue}>25</Text>
-            <Text style={styles.statLabel}>Delivered</Text>
-          </View>
-        </View>
-      </GlassCard>
+      {!subscription ? (
+        <GlassCard style={styles.noSubscriptionCard}>
+          <EmptyState
+            icon="water-outline"
+            title="No Active Subscription"
+            description="Create a subscription to start receiving milk deliveries"
+          />
+        </GlassCard>
+      ) : (
+        <>
+          <GlassCard style={styles.quickStatsCard}>
+            <Text style={styles.cardTitle}>Quick Stats</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Ionicons name="water" size={24} color={COLORS.primary} />
+                <Text style={styles.statValue}>
+                  {formatLiters(dailyLiters)}
+                </Text>
+                <Text style={styles.statLabel}>Daily</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons name="calendar" size={24} color={COLORS.secondary} />
+                <Text style={styles.statValue}>{subscriptionDays}</Text>
+                <Text style={styles.statLabel}>Days</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons
+                  name={
+                    subscription.is_active ? "checkmark-circle" : "pause-circle"
+                  }
+                  size={24}
+                  color={
+                    subscription.is_active ? COLORS.success : COLORS.warning
+                  }
+                />
+                <Text style={styles.statValue}>
+                  {subscription.is_active ? "Active" : "Paused"}
+                </Text>
+                <Text style={styles.statLabel}>Status</Text>
+              </View>
+            </View>
+          </GlassCard>
 
-      <GlassCard style={styles.upcomingCard}>
-        <Text style={styles.cardTitle}>Upcoming Delivery</Text>
-        <View style={styles.deliveryInfo}>
-          <Ionicons name="time" size={20} color={COLORS.textSecondary} />
-          <Text style={styles.deliveryText}>Tomorrow at 7:00 AM</Text>
-        </View>
-        <View style={styles.deliveryInfo}>
-          <Ionicons name="water" size={20} color={COLORS.primary} />
-          <Text style={styles.deliveryText}>2.5 Liters</Text>
-        </View>
-      </GlassCard>
+          <GlassCard style={styles.upcomingCard}>
+            <Text style={styles.cardTitle}>Upcoming Delivery</Text>
+            <View style={styles.deliveryInfo}>
+              <Ionicons name="time" size={20} color={COLORS.textSecondary} />
+              <Text style={styles.deliveryText}>
+                {upcomingDeliveryDate} at 7:00 AM
+              </Text>
+            </View>
+            <View style={styles.deliveryInfo}>
+              <Ionicons name="water" size={20} color={COLORS.primary} />
+              <Text style={styles.deliveryText}>
+                {formatLiters(dailyLiters)}
+              </Text>
+            </View>
+            {subscription.subscription_start_date && (
+              <View style={styles.deliveryInfo}>
+                <Ionicons name="calendar" size={20} color={COLORS.secondary} />
+                <Text style={styles.deliveryText}>
+                  Started: {formatDate(subscription.subscription_start_date)}
+                </Text>
+              </View>
+            )}
+          </GlassCard>
+        </>
+      )}
 
       <GlassCard style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Quick Actions</Text>
@@ -155,5 +252,9 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: SPACING.xs,
     textAlign: "center",
+  },
+  noSubscriptionCard: {
+    marginBottom: SPACING.lg,
+    padding: SPACING.xl,
   },
 });

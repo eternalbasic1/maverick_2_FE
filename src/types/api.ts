@@ -76,7 +76,7 @@ export interface Delivery {
   user_id: string;
   user_name: string;
   user_phone: string;
-  scheduled_liters: string;
+  scheduled_liters: number;
   rate_id: string;
   status: "scheduled" | "delivered" | "failed" | "skipped";
 }
@@ -108,6 +108,22 @@ export interface BillingReport {
     total_delivered_liters: number;
   };
   rate_breakdown: DetailedRateBreakdown[];
+  deliveries?: BillingDelivery[];
+}
+
+export interface BillingDelivery {
+  id: string;
+  delivery_date: string;
+  scheduled_liters: string;
+  actual_liters: string;
+  status: "scheduled" | "delivered" | "failed" | "skipped";
+  rate_applied: string | null;
+}
+
+// All Customers Response
+export interface AllCustomersResponse {
+  count: number;
+  customers: User[];
 }
 
 export interface DetailedRateBreakdown {
@@ -200,3 +216,6 @@ export interface UpdateDeliveryStatusData {
     actual_liters?: string;
   }>;
 }
+
+// Subscription response can be either subscription object or error message
+export type SubscriptionResponse = Subscription | { message: string };
