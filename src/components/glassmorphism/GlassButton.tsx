@@ -7,6 +7,7 @@ import {
   TextStyle,
   Platform,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import {
@@ -23,6 +24,7 @@ interface GlassButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   disabled?: boolean;
+  loading?: boolean;
   variant?: "primary" | "secondary" | "outline";
   size?: "small" | "medium" | "large";
   intensity?: number;
@@ -35,6 +37,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   style,
   textStyle,
   disabled = false,
+  loading = false,
   variant = "primary",
   size = "medium",
   intensity = 20,
@@ -74,11 +77,18 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
       <TouchableOpacity
         style={[getButtonStyle(), styles.androidButton, style]}
         onPress={onPress}
-        disabled={disabled}
+        disabled={disabled || loading}
         activeOpacity={0.8}
       >
         <View style={styles.androidButtonContent}>
-          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+          {loading ? (
+            <ActivityIndicator
+              color={variant === "outline" ? COLORS.text : COLORS[variant]}
+              size="small"
+            />
+          ) : (
+            <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -88,7 +98,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     <TouchableOpacity
       style={[getButtonStyle(), style]}
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       activeOpacity={0.8}
     >
       <BlurView
@@ -96,7 +106,14 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
         tint={getBlurTint()}
         style={styles.blurView}
       >
-        <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        {loading ? (
+          <ActivityIndicator
+            color={variant === "outline" ? COLORS.text : COLORS[variant]}
+            size="small"
+          />
+        ) : (
+          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        )}
       </BlurView>
     </TouchableOpacity>
   );

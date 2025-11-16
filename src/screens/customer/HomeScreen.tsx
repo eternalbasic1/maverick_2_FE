@@ -15,7 +15,8 @@ import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { useAuthContext } from "../../context/AuthContext";
 import { COLORS, TYPOGRAPHY, SPACING } from "../../theme/colors";
 import { subscriptionService } from "../../services/subscription";
-import { Subscription } from "../../types/api";
+import { skipRequestService } from "../../services/skipRequests";
+import { Subscription, SkipRequest } from "../../types/api";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { EmptyState } from "../../components/common/EmptyState";
 import {
@@ -35,10 +36,12 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user } = useAuthContext();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [skipRequests, setSkipRequests] = useState<SkipRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   console.log("🔍 user", user);
   console.log("🔍 subscription", subscription);
+
   const loadSubscription = async () => {
     try {
       const sub = await subscriptionService.getSubscription();
@@ -55,13 +58,74 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  const loadSkipRequests = async () => {
+    try {
+      // Get skip requests for current month and next month to cover upcoming deliveries
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth(), 1)
+        .toISOString()
+        .split("T")[0];
+      // Get next 2 months to ensure we cover all upcoming deliveries
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0)
+        .toISOString()
+        .split("T")[0];
+
+      const requests = await skipRequestService.getSkipRequests(
+        startDate,
+        endDate
+      );
+      setSkipRequests(requests);
+    } catch (error: any) {
+      console.error("Error loading skip requests:", error);
+      // Don't show alert for skip requests, just log the error
+      // This way the home screen still loads even if skip requests fail
+    }
+  };
+
   useEffect(() => {
     loadSubscription();
+    loadSkipRequests();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadSubscription();
+    loadSkipRequests();
+  };
+
+  // Calculate the next delivery date excluding skipped dates
+  const getNextDeliveryDate = (): Date => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    // Create a set of skipped dates for quick lookup
+    const skippedDates = new Set(
+      skipRequests.map((req) => {
+        const date = new Date(req.skip_date);
+        date.setHours(0, 0, 0, 0);
+        return date.getTime();
+      })
+    );
+
+    // Start from tomorrow and find the first date that is not skipped
+    let nextDelivery = new Date(tomorrow);
+    const maxDaysToCheck = 60; // Check up to 60 days ahead
+    let daysChecked = 0;
+
+    while (daysChecked < maxDaysToCheck) {
+      const dateTime = nextDelivery.getTime();
+      if (!skippedDates.has(dateTime)) {
+        // Found a date that is not skipped
+        return nextDelivery;
+      }
+      // Move to next day
+      nextDelivery.setDate(nextDelivery.getDate() + 1);
+      daysChecked++;
+    }
+
+    // If all dates are skipped (unlikely), return tomorrow anyway
+    return tomorrow;
   };
 
   if (loading) {
@@ -83,16 +147,15 @@ export const HomeScreen: React.FC = () => {
       )
     : 0;
 
-  // Calculate upcoming delivery date (tomorrow)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const upcomingDeliveryDate = formatDate(tomorrow, "EEEE, MMMM dd");
+  // Calculate upcoming delivery date (excluding skipped dates)
+  const nextDeliveryDate = getNextDeliveryDate();
+  const upcomingDeliveryDate = formatDate(nextDeliveryDate, "EEEE, MMMM dd");
 
   // Get the rate that will be active on the upcoming delivery date
   const upcomingDeliveryLiters = subscription
     ? getActiveRateForDate(
         subscription.rate_history || [],
-        tomorrow,
+        nextDeliveryDate,
         subscription.current_rate
       )
     : "0";

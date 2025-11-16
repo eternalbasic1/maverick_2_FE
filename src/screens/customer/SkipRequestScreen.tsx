@@ -7,7 +7,10 @@ import {
   Alert,
   TextInput,
   RefreshControl,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -20,7 +23,18 @@ import { formatDate, formatSkipReason } from "../../utils/formatting";
 import { SKIP_REASONS } from "../../utils/constants";
 
 export const SkipRequestScreen: React.FC = () => {
+  const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  };
+
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDateObj, setSelectedDateObj] = useState<Date>(
+    getTomorrowDate()
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateError, setDateError] = useState<string>("");
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [skipRequests, setSkipRequests] = useState<SkipRequest[]>([]);
@@ -66,9 +80,52 @@ export const SkipRequestScreen: React.FC = () => {
     loadSkipRequests();
   };
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+
+      if (selected < tomorrow) {
+        setDateError("Skip date must be from tomorrow onwards");
+        Alert.alert(
+          "Invalid Date",
+          "Skip date must be from tomorrow onwards. You cannot skip today's delivery."
+        );
+        return;
+      }
+
+      setSelectedDateObj(selectedDate);
+      setSelectedDate(selectedDate.toISOString().split("T")[0]);
+      setDateError("");
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedDate) {
       Alert.alert("Error", "Please select a date");
+      return;
+    }
+
+    // Validate date again before submitting - must be from tomorrow onwards
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+
+    if (selected < tomorrow) {
+      setDateError("Skip date must be from tomorrow onwards");
+      Alert.alert(
+        "Invalid Date",
+        "Skip date must be from tomorrow onwards. You cannot skip today's delivery."
+      );
       return;
     }
 
@@ -86,8 +143,10 @@ export const SkipRequestScreen: React.FC = () => {
       });
       Alert.alert("Success", "Skip request created successfully!");
       setSelectedDate("");
+      setSelectedDateObj(getTomorrowDate());
       setSelectedReason("");
       setNotes("");
+      setDateError("");
       loadSkipRequests();
     } catch (error: any) {
       console.error("Error creating skip request:", error);
@@ -126,16 +185,87 @@ export const SkipRequestScreen: React.FC = () => {
 
       <GlassCard style={styles.dateCard}>
         <Text style={styles.cardTitle}>Select Date</Text>
-        <TextInput
-          style={styles.dateInput}
-          placeholder="YYYY-MM-DD (e.g., 2025-11-03)"
-          value={selectedDate}
-          onChangeText={setSelectedDate}
-          placeholderTextColor={COLORS.textTertiary}
-        />
-        <Text style={styles.inputHint}>
-          Select a future date to skip delivery
-        </Text>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          style={styles.datePickerButton}
+        >
+          <View style={styles.datePickerContent}>
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color={COLORS.textSecondary}
+              style={styles.datePickerIcon}
+            />
+            <Text
+              style={[
+                styles.datePickerText,
+                dateError && styles.datePickerTextError,
+              ]}
+            >
+              {selectedDate || "Select date (tomorrow onwards)"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        {dateError ? (
+          <Text style={styles.errorText}>{dateError}</Text>
+        ) : (
+          <Text style={styles.inputHint}>
+            Select a date from tomorrow onwards to skip delivery
+          </Text>
+        )}
+        {showDatePicker && (
+          <View style={styles.datePickerContainer}>
+            {Platform.OS === "ios" ? (
+              <>
+                <View style={styles.datePickerHeader}>
+                  <Text style={styles.datePickerHeaderText}>
+                    Select Skip Date
+                  </Text>
+                </View>
+                <View style={styles.datePickerWrapper}>
+                  <DateTimePicker
+                    value={selectedDateObj}
+                    mode="date"
+                    display="spinner"
+                    onChange={handleDateChange}
+                    minimumDate={getTomorrowDate()}
+                    textColor={COLORS.text}
+                    themeVariant="light"
+                    style={styles.datePicker}
+                    locale="en_US"
+                  />
+                </View>
+                <View style={styles.iosPickerButtons}>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(false)}
+                    style={styles.iosPickerButton}
+                  >
+                    <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowDatePicker(false);
+                    }}
+                    style={[
+                      styles.iosPickerButton,
+                      styles.iosPickerButtonPrimary,
+                    ]}
+                  >
+                    <Text style={styles.iosPickerButtonTextPrimary}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <DateTimePicker
+                value={selectedDateObj}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                minimumDate={getTomorrowDate()}
+              />
+            )}
+          </View>
+        )}
       </GlassCard>
 
       <GlassCard style={styles.reasonCard}>
@@ -268,19 +398,105 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
-  dateInput: {
+  datePickerButton: {
     backgroundColor: COLORS.surfaceVariant,
     borderRadius: 8,
-    padding: SPACING.md,
-    ...TYPOGRAPHY.bodyMedium,
-    color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
+    padding: SPACING.md,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  datePickerTextError: {
+    color: COLORS.error,
+  },
+  errorText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
   },
   inputHint: {
     ...TYPOGRAPHY.labelSmall,
     color: COLORS.textTertiary,
     marginTop: SPACING.xs,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   reasonCard: {
     marginBottom: SPACING.lg,
