@@ -20,10 +20,37 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   borderRadius = BORDER_RADIUS.lg,
   padding = SPACING.md,
 }) => {
-  // On Android, use solid white background for consistency with iOS
+  // On Android, use solid background for consistency with iOS
   if (Platform.OS === "android") {
+    // Flatten style if it's an array
+    const flatStyle = Array.isArray(style)
+      ? Object.assign({}, ...style.filter(Boolean))
+      : style || {};
+
+    // Extract backgroundColor from style prop if provided, otherwise use default
+    const customBackgroundColor = flatStyle.backgroundColor;
+    const androidBackgroundColor = customBackgroundColor || COLORS.surface;
+
+    // Extract borderColor from style prop if provided, otherwise use default
+    const customBorderColor = flatStyle.borderColor;
+    const androidBorderColor = customBorderColor || COLORS.border;
+
+    // Create style without backgroundColor and borderColor to avoid duplication
+    const { backgroundColor, borderColor, ...restStyle } = flatStyle;
+
     return (
-      <View style={[styles.androidContainer, { borderRadius, padding }, style]}>
+      <View
+        style={[
+          styles.androidContainer,
+          {
+            borderRadius,
+            padding,
+            backgroundColor: androidBackgroundColor,
+            borderColor: androidBorderColor,
+          },
+          restStyle,
+        ]}
+      >
         {children}
       </View>
     );
@@ -60,9 +87,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   androidContainer: {
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.md,
+    overflow: "hidden", // Ensure clean edges, no visual artifacts
+    // No elevation/shadow on Android to avoid visible padding effect
+    // The border provides enough visual separation
   },
 });
