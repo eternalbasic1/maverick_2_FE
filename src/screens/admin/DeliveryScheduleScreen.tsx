@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -49,6 +49,7 @@ export const DeliveryScheduleScreen: React.FC = () => {
   const [deliveryReason, setDeliveryReason] = useState<string>("");
   const [undeliveredReason, setUndeliveredReason] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const isInitialMount = useRef(true);
 
   const loadSchedule = async () => {
     try {
@@ -82,6 +83,20 @@ export const DeliveryScheduleScreen: React.FC = () => {
     }
   }, [selectedDate]);
 
+  // Reload schedule when selectedDate changes
+  useEffect(() => {
+    // Skip initial mount (handled by first useEffect)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Reload schedule when date changes
+    if (selectedDate) {
+      loadSchedule();
+    }
+  }, [selectedDate]);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadSchedule();
@@ -95,10 +110,7 @@ export const DeliveryScheduleScreen: React.FC = () => {
         setSelectedDateObj(selectedDate);
         const dateString = selectedDate.toISOString().split("T")[0];
         setSelectedDate(dateString);
-        // Trigger reload after a short delay to ensure state is updated
-        setTimeout(() => {
-          loadSchedule();
-        }, 100);
+        // Schedule will reload automatically via useEffect when selectedDate changes
       }
       return;
     }
@@ -110,14 +122,11 @@ export const DeliveryScheduleScreen: React.FC = () => {
   };
 
   const handleDonePress = () => {
-    // On iOS, update the selected date string and reload schedule when Done is clicked
+    // On iOS, update the selected date string - useEffect will handle reload
     const dateString = selectedDateObj.toISOString().split("T")[0];
     setSelectedDate(dateString);
     setShowDatePicker(false);
-    // Trigger reload after a short delay to ensure state is updated
-    setTimeout(() => {
-      loadSchedule();
-    }, 100);
+    // Schedule will reload automatically via useEffect when selectedDate changes
   };
 
   const openUpdateModal = (delivery: Delivery) => {
