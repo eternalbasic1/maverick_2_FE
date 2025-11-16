@@ -79,6 +79,7 @@ export interface Delivery {
   scheduled_liters: number;
   rate_id: string;
   status: "scheduled" | "delivered" | "failed" | "skipped";
+  reason?: string | null; // Optional reason field for delivery status
 }
 
 // Admin Skip Requests
@@ -214,6 +215,7 @@ export interface UpdateDeliveryStatusData {
     user_id: string;
     status: "scheduled" | "delivered" | "failed" | "skipped";
     actual_liters?: string;
+    reason?: string | null; // Optional reason field for delivery status
   }>;
 }
 

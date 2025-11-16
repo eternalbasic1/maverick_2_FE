@@ -101,7 +101,7 @@ export const AdminDashboardScreen: React.FC = () => {
         </View>
       </GlassCard>
 
-      <GlassCard style={styles.pendingCard}>
+      {/* <GlassCard style={styles.pendingCard}>
         <Text style={styles.cardTitle}>Delivery Status</Text>
         <View style={styles.pendingItem}>
           <Ionicons name="time-outline" size={20} color={COLORS.warning} />
@@ -144,7 +144,7 @@ export const AdminDashboardScreen: React.FC = () => {
             color={COLORS.textTertiary}
           />
         </View>
-      </GlassCard>
+      </GlassCard> */}
 
       {schedule && schedule.deliveries.length > 0 && (
         <GlassCard style={styles.recentCard}>
@@ -190,6 +190,19 @@ export const AdminDashboardScreen: React.FC = () => {
                 <Text style={styles.activityTime}>
                   Status: {delivery.status}
                 </Text>
+                {delivery.reason && (
+                  <View style={styles.reasonContainer}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={12}
+                      color={COLORS.textSecondary}
+                      style={styles.reasonIcon}
+                    />
+                    <Text style={styles.reasonText} numberOfLines={1}>
+                      {delivery.reason}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           ))}
@@ -296,5 +309,24 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+  },
+  reasonContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: SPACING.xs,
+    padding: SPACING.xs,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: 4,
+  },
+  reasonIcon: {
+    marginRight: SPACING.xs,
+    marginTop: 1,
+  },
+  reasonText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+    flex: 1,
+    fontStyle: "italic",
+    fontSize: 11,
   },
 });

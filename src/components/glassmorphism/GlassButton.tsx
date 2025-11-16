@@ -72,6 +72,12 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     return tint;
   };
 
+  // Extract paddingHorizontal from style if provided
+  const flatStyle = Array.isArray(style)
+    ? Object.assign({}, ...style.filter(Boolean))
+    : style || {};
+  const customPaddingHorizontal = flatStyle.paddingHorizontal;
+
   if (Platform.OS === "android") {
     return (
       <TouchableOpacity
@@ -80,14 +86,28 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
         disabled={disabled || loading}
         activeOpacity={0.8}
       >
-        <View style={styles.androidButtonContent}>
+        <View
+          style={[
+            styles.androidButtonContent,
+            customPaddingHorizontal !== undefined && {
+              paddingHorizontal: customPaddingHorizontal,
+            },
+          ]}
+        >
           {loading ? (
             <ActivityIndicator
               color={variant === "outline" ? COLORS.text : COLORS[variant]}
               size="small"
             />
           ) : (
-            <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+            <Text
+              style={[getTextStyle(), textStyle]}
+              numberOfLines={2}
+              adjustsFontSizeToFit={true}
+              minimumFontScale={0.8}
+            >
+              {title}
+            </Text>
           )}
         </View>
       </TouchableOpacity>
@@ -104,7 +124,12 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
       <BlurView
         intensity={intensity}
         tint={getBlurTint()}
-        style={styles.blurView}
+        style={[
+          styles.blurView,
+          customPaddingHorizontal !== undefined && {
+            paddingHorizontal: customPaddingHorizontal,
+          },
+        ]}
       >
         {loading ? (
           <ActivityIndicator
@@ -112,7 +137,14 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
             size="small"
           />
         ) : (
-          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+          <Text
+            style={[getTextStyle(), textStyle]}
+            numberOfLines={2}
+            adjustsFontSizeToFit={true}
+            minimumFontScale={0.8}
+          >
+            {title}
+          </Text>
         )}
       </BlurView>
     </TouchableOpacity>
@@ -132,6 +164,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 0,
   },
   androidButton: {
     backgroundColor: COLORS.surface,
@@ -142,6 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 0,
   },
   text: {
     fontWeight: "600",
