@@ -224,6 +224,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
+    paddingBottom: SPACING.xl + 80, // Extra padding for tab bar
   },
   header: {
     marginBottom: SPACING.xl,

@@ -1,12 +1,13 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { HomeScreen } from "../screens/customer/HomeScreen";
 import { SubscriptionScreen } from "../screens/customer/SubscriptionScreen";
 import { SkipRequestScreen } from "../screens/customer/SkipRequestScreen";
 import { BillingHistoryScreen } from "../screens/customer/BillingHistoryScreen";
 import { ProfileScreen } from "../screens/customer/ProfileScreen";
-import { COLORS, TYPOGRAPHY } from "../theme/colors";
+import { COLORS, TYPOGRAPHY, SPACING } from "../theme/colors";
 
 export type CustomerTabParamList = {
   Home: undefined;
@@ -19,8 +20,12 @@ export type CustomerTabParamList = {
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
 export const CustomerNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
   console.log("🔍 CustomerNavigator rendered");
   console.log("🔍 ProfileScreen imported:", ProfileScreen);
+
+  // Calculate tab bar height with safe area insets
+  const tabBarHeight = 56 + insets.bottom; // Base height + bottom inset
 
   return (
     <Tab.Navigator
@@ -56,18 +61,32 @@ export const CustomerNavigator: React.FC = () => {
           backgroundColor: COLORS.surface,
           borderTopColor: COLORS.border,
           borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, SPACING.xs),
+          paddingTop: SPACING.xs,
+          height: tabBarHeight,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: -2,
+          },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
           ...TYPOGRAPHY.labelSmall,
-          marginTop: 4,
+          marginTop: 2,
+          marginBottom: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: SPACING.xs,
         },
         headerStyle: {
           backgroundColor: COLORS.background,
           borderBottomColor: COLORS.border,
           borderBottomWidth: 1,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         headerTitleStyle: {
           ...TYPOGRAPHY.headlineSmall,

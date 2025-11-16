@@ -9,7 +9,9 @@ import {
   Modal,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -35,9 +37,18 @@ export const SubscriptionScreen: React.FC = () => {
     new Date().toISOString().split("T")[0]
   );
   const [newDailyLiters, setNewDailyLiters] = useState("");
+  const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  };
+
   const [effectiveFrom, setEffectiveFrom] = useState(
-    new Date().toISOString().split("T")[0]
+    getTomorrowDate().toISOString().split("T")[0]
   );
+  const [effectiveFromDate, setEffectiveFromDate] = useState(getTomorrowDate());
+  const [showEffectiveFromPicker, setShowEffectiveFromPicker] = useState(false);
+  const [effectiveFromError, setEffectiveFromError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   const loadSubscription = async () => {
@@ -93,9 +104,52 @@ export const SubscriptionScreen: React.FC = () => {
     }
   };
 
+  const handleEffectiveFromChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowEffectiveFromPicker(false);
+    }
+
+    if (selectedDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+
+      if (selected < tomorrow) {
+        setEffectiveFromError("Effective date must be from tomorrow onwards");
+        Alert.alert(
+          "Invalid Date",
+          "Effective date must be from tomorrow onwards. You cannot change the daily liters for today."
+        );
+        return;
+      }
+
+      setEffectiveFromDate(selectedDate);
+      setEffectiveFrom(selectedDate.toISOString().split("T")[0]);
+      setEffectiveFromError("");
+    }
+  };
+
   const handleUpdateRate = async () => {
     if (!newDailyLiters || !effectiveFrom) {
       Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    // Validate date again before submitting - must be from tomorrow onwards
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(effectiveFrom);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < tomorrow) {
+      setEffectiveFromError("Effective date must be from tomorrow onwards");
+      Alert.alert(
+        "Invalid Date",
+        "Effective date must be from tomorrow onwards. You cannot change the daily liters for today."
+      );
       return;
     }
 
@@ -108,7 +162,11 @@ export const SubscriptionScreen: React.FC = () => {
       Alert.alert("Success", "Subscription rate updated successfully!");
       setShowUpdateModal(false);
       setNewDailyLiters("");
-      setEffectiveFrom(new Date().toISOString().split("T")[0]);
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      setEffectiveFrom(tomorrowDate.toISOString().split("T")[0]);
+      setEffectiveFromDate(tomorrowDate);
+      setEffectiveFromError("");
       loadSubscription();
     } catch (error: any) {
       console.error("Error updating rate:", error);
@@ -246,13 +304,14 @@ export const SubscriptionScreen: React.FC = () => {
         onRequestClose={() => setShowCreateModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create Subscription</Text>
 
             <Text style={styles.inputLabel}>Daily Liters</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 2.5"
+              placeholderTextColor={COLORS.textTertiary}
               value={dailyLiters}
               onChangeText={setDailyLiters}
               keyboardType="decimal-pad"
@@ -262,6 +321,7 @@ export const SubscriptionScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               placeholder="YYYY-MM-DD"
+              placeholderTextColor={COLORS.textTertiary}
               value={startDate}
               onChangeText={setStartDate}
             />
@@ -280,7 +340,7 @@ export const SubscriptionScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
-          </GlassCard>
+          </View>
         </View>
       </Modal>
 
@@ -292,25 +352,99 @@ export const SubscriptionScreen: React.FC = () => {
         onRequestClose={() => setShowUpdateModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Update Daily Amount</Text>
 
             <Text style={styles.inputLabel}>New Daily Liters</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 3.0"
+              placeholderTextColor={COLORS.textTertiary}
               value={newDailyLiters}
               onChangeText={setNewDailyLiters}
               keyboardType="decimal-pad"
             />
 
             <Text style={styles.inputLabel}>Effective From</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={effectiveFrom}
-              onChangeText={setEffectiveFrom}
-            />
+            <TouchableOpacity
+              onPress={() => setShowEffectiveFromPicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text
+                  style={[
+                    styles.datePickerText,
+                    effectiveFromError && styles.datePickerTextError,
+                  ]}
+                >
+                  {effectiveFrom || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {effectiveFromError ? (
+              <Text style={styles.errorText}>{effectiveFromError}</Text>
+            ) : null}
+            {showEffectiveFromPicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select Effective Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={effectiveFromDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleEffectiveFromChange}
+                        minimumDate={getTomorrowDate()}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowEffectiveFromPicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowEffectiveFromPicker(false);
+                        }}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={effectiveFromDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleEffectiveFromChange}
+                    minimumDate={getTomorrowDate()}
+                  />
+                )}
+              </View>
+            )}
 
             <View style={styles.modalButtons}>
               <GlassButton
@@ -326,7 +460,7 @@ export const SubscriptionScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
-          </GlassCard>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -340,6 +474,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
+    paddingBottom: SPACING.xl + 80, // Extra padding for tab bar
   },
   subscriptionCard: {
     marginBottom: SPACING.lg,
@@ -414,7 +549,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
     padding: SPACING.lg,
@@ -422,27 +557,41 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 400,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
     padding: SPACING.xl,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   modalTitle: {
     ...TYPOGRAPHY.titleLarge,
     color: COLORS.text,
     marginBottom: SPACING.lg,
     textAlign: "center",
+    fontWeight: "700",
   },
   inputLabel: {
     ...TYPOGRAPHY.labelMedium,
     color: COLORS.text,
     marginBottom: SPACING.xs,
     marginTop: SPACING.md,
+    fontWeight: "600",
   },
   input: {
-    backgroundColor: COLORS.surfaceVariant,
-    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
     padding: SPACING.md,
     ...TYPOGRAPHY.bodyMedium,
     color: COLORS.text,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.border,
   },
   modalButtons: {
@@ -453,5 +602,102 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  datePickerButton: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  datePickerTextError: {
+    color: COLORS.error,
+  },
+  errorText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
+    marginLeft: SPACING.xs,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

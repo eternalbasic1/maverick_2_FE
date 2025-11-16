@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100, // Extra padding for tab bar
   },
   header: {
     marginBottom: 20,
