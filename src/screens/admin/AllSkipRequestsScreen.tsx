@@ -5,10 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  TextInput,
   Modal,
   RefreshControl,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -24,14 +26,21 @@ export const AllSkipRequestsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
-  const [startDate, setStartDate] = useState(() => {
+  const getDefaultStartDate = () => {
     const date = new Date();
     date.setMonth(date.getMonth() - 1);
-    return date.toISOString().split("T")[0];
+    return date;
+  };
+  const [startDate, setStartDate] = useState(() => {
+    return getDefaultStartDate().toISOString().split("T")[0];
   });
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
+  const [startDateObj, setStartDateObj] = useState<Date>(getDefaultStartDate());
+  const [endDateObj, setEndDateObj] = useState<Date>(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const loadSkipRequests = async () => {
     try {
@@ -62,7 +71,71 @@ export const AllSkipRequestsScreen: React.FC = () => {
     loadSkipRequests();
   };
 
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowStartDatePicker(false);
+    }
+
+    if (selectedDate) {
+      setStartDateObj(selectedDate);
+      // On Android, update immediately
+      if (Platform.OS === "android") {
+        const dateString = selectedDate.toISOString().split("T")[0];
+        setStartDate(dateString);
+      }
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowEndDatePicker(false);
+    }
+
+    if (selectedDate) {
+      setEndDateObj(selectedDate);
+      // On Android, update immediately
+      if (Platform.OS === "android") {
+        const dateString = selectedDate.toISOString().split("T")[0];
+        setEndDate(dateString);
+      }
+    }
+  };
+
+  const handleStartDateDone = () => {
+    const dateString = startDateObj.toISOString().split("T")[0];
+    setStartDate(dateString);
+    setShowStartDatePicker(false);
+  };
+
+  const handleEndDateDone = () => {
+    const dateString = endDateObj.toISOString().split("T")[0];
+    setEndDate(dateString);
+    setShowEndDatePicker(false);
+  };
+
   const handleDateRangeChange = () => {
+    // Update dates from date objects if on iOS
+    let finalStartDate = startDate;
+    let finalEndDate = endDate;
+
+    if (Platform.OS === "ios") {
+      finalStartDate = startDateObj.toISOString().split("T")[0];
+      finalEndDate = endDateObj.toISOString().split("T")[0];
+    }
+
+    // Validate that end date is not before start date
+    const start = new Date(finalStartDate);
+    const end = new Date(finalEndDate);
+    if (end < start) {
+      Alert.alert(
+        "Invalid Date Range",
+        "End date cannot be before start date. Please select a valid date range."
+      );
+      return;
+    }
+
+    setStartDate(finalStartDate);
+    setEndDate(finalEndDate);
     setShowDateRangeModal(false);
     setLoading(true);
     loadSkipRequests();
@@ -85,7 +158,22 @@ export const AllSkipRequestsScreen: React.FC = () => {
           <Text style={styles.cardTitle}>Skip Requests Summary</Text>
           <GlassButton
             title="Filter Dates"
-            onPress={() => setShowDateRangeModal(true)}
+            onPress={() => {
+              // Sync date objects with current date strings when opening modal
+              if (startDate) {
+                const start = new Date(startDate);
+                if (!isNaN(start.getTime())) {
+                  setStartDateObj(start);
+                }
+              }
+              if (endDate) {
+                const end = new Date(endDate);
+                if (!isNaN(end.getTime())) {
+                  setEndDateObj(end);
+                }
+              }
+              setShowDateRangeModal(true);
+            }}
             variant="outline"
             style={styles.filterButton}
           />
@@ -165,26 +253,164 @@ export const AllSkipRequestsScreen: React.FC = () => {
         onRequestClose={() => setShowDateRangeModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Date Range</Text>
 
             <Text style={styles.inputLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholderTextColor={COLORS.textTertiary}
-            />
+            <TouchableOpacity
+              onPress={() => {
+                if (!startDate) {
+                  setStartDateObj(getDefaultStartDate());
+                }
+                setShowStartDatePicker(true);
+              }}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {startDate
+                    ? formatDate(startDate, "EEEE, MMMM dd, yyyy")
+                    : "Select start date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select Start Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={startDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleStartDateChange}
+                        maximumDate={endDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowStartDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleStartDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={startDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleStartDateChange}
+                    maximumDate={endDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <Text style={styles.inputLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholderTextColor={COLORS.textTertiary}
-            />
+            <TouchableOpacity
+              onPress={() => {
+                if (!endDate) {
+                  setEndDateObj(new Date());
+                }
+                setShowEndDatePicker(true);
+              }}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {endDate
+                    ? formatDate(endDate, "EEEE, MMMM dd, yyyy")
+                    : "Select end date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select End Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={endDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleEndDateChange}
+                        minimumDate={startDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowEndDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleEndDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={endDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleEndDateChange}
+                    minimumDate={startDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <View style={styles.modalButtons}>
               <GlassButton
@@ -199,7 +425,7 @@ export const AllSkipRequestsScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
-          </GlassCard>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -297,7 +523,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
     padding: SPACING.lg,
@@ -305,28 +531,121 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 400,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
     padding: SPACING.xl,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   modalTitle: {
     ...TYPOGRAPHY.titleLarge,
     color: COLORS.text,
     marginBottom: SPACING.lg,
     textAlign: "center",
+    fontWeight: "700",
   },
   inputLabel: {
     ...TYPOGRAPHY.labelMedium,
     color: COLORS.text,
     marginBottom: SPACING.xs,
     marginTop: SPACING.md,
+    fontWeight: "600",
   },
-  input: {
-    backgroundColor: COLORS.surfaceVariant,
-    borderRadius: 8,
+  datePickerButton: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
     padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
     ...TYPOGRAPHY.bodyMedium,
     color: COLORS.text,
+    flex: 1,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   modalButtons: {
     flexDirection: "row",
