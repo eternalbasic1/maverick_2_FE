@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { View, StyleSheet, ViewStyle, Platform } from "react-native";
 import { BlurView } from "expo-blur";
 import { COLORS, BORDER_RADIUS, SPACING, SHADOWS } from "../../theme/colors";
 
@@ -20,6 +20,16 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   borderRadius = BORDER_RADIUS.lg,
   padding = SPACING.md,
 }) => {
+  // On Android, use solid white background for consistency with iOS
+  if (Platform.OS === "android") {
+    return (
+      <View style={[styles.androidContainer, { borderRadius, padding }, style]}>
+        {children}
+      </View>
+    );
+  }
+
+  // On iOS, use glassmorphic effect
   return (
     <View style={[styles.container, { borderRadius }, style]}>
       <BlurView
@@ -48,5 +58,11 @@ const styles = StyleSheet.create({
   },
   blurView: {
     flex: 1,
+  },
+  androidContainer: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.md,
   },
 });

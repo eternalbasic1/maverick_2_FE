@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  Platform,
+  View,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import {
@@ -38,8 +40,8 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   intensity = 20,
   tint = "light",
 }) => {
-  const getButtonStyle = () => {
-    const baseStyle = [styles.button, styles[`${size}Button`]];
+  const getButtonStyle = (): ViewStyle[] => {
+    const baseStyle: ViewStyle[] = [styles.button, styles[`${size}Button`]];
 
     if (disabled) {
       baseStyle.push(styles.disabled);
@@ -66,6 +68,21 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     if (disabled) return "light";
     return tint;
   };
+
+  if (Platform.OS === "android") {
+    return (
+      <TouchableOpacity
+        style={[getButtonStyle(), styles.androidButton, style]}
+        onPress={onPress}
+        disabled={disabled}
+        activeOpacity={0.8}
+      >
+        <View style={styles.androidButtonContent}>
+          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -94,6 +111,16 @@ const styles = StyleSheet.create({
     ...SHADOWS.sm,
   },
   blurView: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  androidButton: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+  },
+  androidButtonContent: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     alignItems: "center",
