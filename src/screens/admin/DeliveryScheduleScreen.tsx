@@ -9,7 +9,9 @@ import {
   Modal,
   RefreshControl,
   TouchableOpacity,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -29,6 +31,8 @@ export const DeliveryScheduleScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [selectedDateObj, setSelectedDateObj] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [schedule, setSchedule] = useState<DeliverySchedule | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,7 +62,18 @@ export const DeliveryScheduleScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    // Load schedule on initial mount
     loadSchedule();
+  }, []);
+
+  // Sync date object with selected date string when it changes externally
+  useEffect(() => {
+    if (selectedDate) {
+      const date = new Date(selectedDate);
+      if (!isNaN(date.getTime())) {
+        setSelectedDateObj(date);
+      }
+    }
   }, [selectedDate]);
 
   const onRefresh = () => {
@@ -66,8 +81,37 @@ export const DeliveryScheduleScreen: React.FC = () => {
     loadSchedule();
   };
 
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      // On Android, update immediately when date is selected
+      if (selectedDate) {
+        setSelectedDateObj(selectedDate);
+        const dateString = selectedDate.toISOString().split("T")[0];
+        setSelectedDate(dateString);
+        // Trigger reload after a short delay to ensure state is updated
+        setTimeout(() => {
+          loadSchedule();
+        }, 100);
+      }
+      return;
+    }
+
+    // On iOS, only update the date object as user scrolls (don't update selectedDate string yet)
+    if (selectedDate) {
+      setSelectedDateObj(selectedDate);
+    }
+  };
+
+  const handleDonePress = () => {
+    // On iOS, update the selected date string and reload schedule when Done is clicked
+    const dateString = selectedDateObj.toISOString().split("T")[0];
+    setSelectedDate(dateString);
+    setShowDatePicker(false);
+    // Trigger reload after a short delay to ensure state is updated
+    setTimeout(() => {
+      loadSchedule();
+    }, 100);
   };
 
   const openUpdateModal = (delivery: Delivery) => {
@@ -182,13 +226,76 @@ export const DeliveryScheduleScreen: React.FC = () => {
     >
       <GlassCard style={styles.dateCard}>
         <Text style={styles.cardTitle}>Select Date</Text>
-        <TextInput
-          style={styles.dateInput}
-          placeholder="YYYY-MM-DD"
-          value={selectedDate}
-          onChangeText={handleDateChange}
-          placeholderTextColor={COLORS.textTertiary}
-        />
+        <TouchableOpacity
+          onPress={() => {
+            if (!selectedDate) {
+              setSelectedDateObj(new Date());
+            }
+            setShowDatePicker(true);
+          }}
+          style={styles.datePickerButton}
+        >
+          <View style={styles.datePickerContent}>
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color={COLORS.textSecondary}
+              style={styles.datePickerIcon}
+            />
+            <Text style={styles.datePickerText}>
+              {selectedDate
+                ? formatDate(selectedDate, "EEEE, MMMM dd, yyyy")
+                : "Select date"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <View style={styles.datePickerContainer}>
+            {Platform.OS === "ios" ? (
+              <>
+                <View style={styles.datePickerHeader}>
+                  <Text style={styles.datePickerHeaderText}>Select Date</Text>
+                </View>
+                <View style={styles.datePickerWrapper}>
+                  <DateTimePicker
+                    value={selectedDateObj}
+                    mode="date"
+                    display="spinner"
+                    onChange={handleDateChange}
+                    textColor={COLORS.text}
+                    themeVariant="light"
+                    style={styles.datePicker}
+                    locale="en_US"
+                  />
+                </View>
+                <View style={styles.iosPickerButtons}>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(false)}
+                    style={styles.iosPickerButton}
+                  >
+                    <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleDonePress}
+                    style={[
+                      styles.iosPickerButton,
+                      styles.iosPickerButtonPrimary,
+                    ]}
+                  >
+                    <Text style={styles.iosPickerButtonTextPrimary}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <DateTimePicker
+                value={selectedDateObj}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+          </View>
+        )}
       </GlassCard>
 
       {schedule && (
@@ -379,14 +486,92 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
-  dateInput: {
+  datePickerButton: {
     backgroundColor: COLORS.surfaceVariant,
     borderRadius: 8,
-    padding: SPACING.md,
-    ...TYPOGRAPHY.bodyMedium,
-    color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
+    padding: SPACING.md,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   summaryCard: {
     marginBottom: SPACING.lg,
