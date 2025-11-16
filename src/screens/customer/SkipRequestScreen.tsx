@@ -80,30 +80,47 @@ export const SkipRequestScreen: React.FC = () => {
     loadSkipRequests();
   };
 
+  const validateAndSetDate = (dateToValidate: Date) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const selected = new Date(dateToValidate);
+    selected.setHours(0, 0, 0, 0);
+
+    if (selected < tomorrow) {
+      setDateError("Skip date must be from tomorrow onwards");
+      Alert.alert(
+        "Invalid Date",
+        "Skip date must be from tomorrow onwards. You cannot skip today's delivery."
+      );
+      return false;
+    }
+
+    setSelectedDateObj(dateToValidate);
+    setSelectedDate(dateToValidate.toISOString().split("T")[0]);
+    setDateError("");
+    return true;
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
 
     if (selectedDate) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      const selected = new Date(selectedDate);
-      selected.setHours(0, 0, 0, 0);
-
-      if (selected < tomorrow) {
-        setDateError("Skip date must be from tomorrow onwards");
-        Alert.alert(
-          "Invalid Date",
-          "Skip date must be from tomorrow onwards. You cannot skip today's delivery."
-        );
-        return;
-      }
-
+      // Update the date object as user changes it
       setSelectedDateObj(selectedDate);
-      setSelectedDate(selectedDate.toISOString().split("T")[0]);
-      setDateError("");
+      // Validate and set the date string only when user confirms (Done button or Android selection)
+      if (Platform.OS === "android") {
+        validateAndSetDate(selectedDate);
+      }
+    }
+  };
+
+  const handleDonePress = () => {
+    // When Done is clicked, validate and set the currently displayed date
+    if (validateAndSetDate(selectedDateObj)) {
+      setShowDatePicker(false);
     }
   };
 
@@ -186,7 +203,14 @@ export const SkipRequestScreen: React.FC = () => {
       <GlassCard style={styles.dateCard}>
         <Text style={styles.cardTitle}>Select Date</Text>
         <TouchableOpacity
-          onPress={() => setShowDatePicker(true)}
+          onPress={() => {
+            // Ensure we have a default date (tomorrow) when opening picker
+            if (!selectedDate) {
+              const tomorrow = getTomorrowDate();
+              setSelectedDateObj(tomorrow);
+            }
+            setShowDatePicker(true);
+          }}
           style={styles.datePickerButton}
         >
           <View style={styles.datePickerContent}>
@@ -243,9 +267,7 @@ export const SkipRequestScreen: React.FC = () => {
                     <Text style={styles.iosPickerButtonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => {
-                      setShowDatePicker(false);
-                    }}
+                    onPress={handleDonePress}
                     style={[
                       styles.iosPickerButton,
                       styles.iosPickerButtonPrimary,
