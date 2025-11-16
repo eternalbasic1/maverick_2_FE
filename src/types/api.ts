@@ -20,7 +20,7 @@ export interface Subscription {
   is_active: boolean;
   subscription_start_date: string;
   subscription_end_date: string | null;
-  current_rate: Rate;
+  current_rate: string;
   rate_history: Rate[];
   created_at: string;
   updated_at: string;

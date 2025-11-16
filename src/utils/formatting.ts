@@ -1,4 +1,12 @@
-import { format, parseISO, isValid } from "date-fns";
+import {
+  format,
+  parseISO,
+  isValid,
+  isAfter,
+  isBefore,
+  isEqual,
+} from "date-fns";
+import { Rate } from "../types/api";
 
 // Date formatting utilities
 export const formatDate = (
@@ -242,4 +250,58 @@ export const formatIndianNumber = (num: number): string => {
     return `${(num / 1000).toFixed(1)} K`;
   }
   return num.toString();
+};
+
+// Get active rate from rate history for a specific date
+export const getActiveRateForDate = (
+  rateHistory: Rate[],
+  targetDate: Date,
+  fallbackRate?: string
+): string => {
+  if (!rateHistory || rateHistory.length === 0) {
+    return fallbackRate || "0";
+  }
+
+  const date = new Date(targetDate);
+  date.setHours(0, 0, 0, 0);
+
+  // Sort rate_history by effective_from (most recent first) to check latest rates first
+  const sortedRates = [...rateHistory].sort((a, b) => {
+    const dateA = parseISO(a.effective_from).getTime();
+    const dateB = parseISO(b.effective_from).getTime();
+    return dateB - dateA;
+  });
+
+  // Find the rate that covers the target date
+  for (const rate of sortedRates) {
+    const effectiveFrom = parseISO(rate.effective_from);
+    effectiveFrom.setHours(0, 0, 0, 0);
+
+    const effectiveTo = rate.effective_to ? parseISO(rate.effective_to) : null;
+    if (effectiveTo) {
+      effectiveTo.setHours(23, 59, 59, 999); // Include the entire end date
+    }
+
+    // Check if target date is within the effective date range
+    const isAfterOrEqualFrom =
+      isEqual(date, effectiveFrom) || isAfter(date, effectiveFrom);
+    const isBeforeOrEqualTo =
+      !effectiveTo || isEqual(date, effectiveTo) || isBefore(date, effectiveTo);
+
+    if (isAfterOrEqualFrom && isBeforeOrEqualTo) {
+      return rate.daily_liters;
+    }
+  }
+
+  // If no rate found for the target date, return fallback or the most recent rate's value
+  return fallbackRate || sortedRates[0]?.daily_liters || "0";
+};
+
+// Get current active rate from rate history based on current date
+export const getCurrentActiveRate = (
+  rateHistory: Rate[],
+  fallbackRate?: string
+): string => {
+  const today = new Date();
+  return getActiveRateForDate(rateHistory, today, fallbackRate);
 };

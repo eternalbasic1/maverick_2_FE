@@ -18,7 +18,11 @@ import { subscriptionService } from "../../services/subscription";
 import { Subscription } from "../../types/api";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { EmptyState } from "../../components/common/EmptyState";
-import { formatDate, formatLiters } from "../../utils/formatting";
+import {
+  formatDate,
+  formatLiters,
+  getCurrentActiveRate,
+} from "../../utils/formatting";
 
 export const SubscriptionScreen: React.FC = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -152,7 +156,12 @@ export const SubscriptionScreen: React.FC = () => {
                 <Ionicons name="water" size={20} color={COLORS.primary} />
                 <Text style={styles.infoLabel}>Daily Amount:</Text>
                 <Text style={styles.infoValue}>
-                  {formatLiters(subscription.current_rate?.daily_liters || 0)}
+                  {formatLiters(
+                    getCurrentActiveRate(
+                      subscription.rate_history || [],
+                      subscription.current_rate
+                    )
+                  )}
                 </Text>
               </View>
               <View style={styles.infoRow}>

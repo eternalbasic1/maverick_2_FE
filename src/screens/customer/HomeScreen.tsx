@@ -6,7 +6,10 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  TouchableOpacity,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { useAuthContext } from "../../context/AuthContext";
@@ -15,9 +18,21 @@ import { subscriptionService } from "../../services/subscription";
 import { Subscription } from "../../types/api";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { EmptyState } from "../../components/common/EmptyState";
-import { formatDate, formatLiters } from "../../utils/formatting";
+import {
+  formatDate,
+  formatLiters,
+  getCurrentActiveRate,
+  getActiveRateForDate,
+} from "../../utils/formatting";
+import { CustomerTabParamList } from "../../navigation/CustomerNavigator";
+
+type HomeScreenNavigationProp = BottomTabNavigationProp<
+  CustomerTabParamList,
+  "Home"
+>;
 
 export const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user } = useAuthContext();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +68,13 @@ export const HomeScreen: React.FC = () => {
     return <LoadingSpinner message="Loading subscription..." />;
   }
 
-  const dailyLiters = subscription?.current_rate || "0";
+  // Get current active rate from rate_history based on current date
+  const dailyLiters = subscription
+    ? getCurrentActiveRate(
+        subscription.rate_history || [],
+        subscription.current_rate
+      )
+    : "0";
   const subscriptionDays = subscription
     ? Math.floor(
         (new Date().getTime() -
@@ -66,6 +87,15 @@ export const HomeScreen: React.FC = () => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const upcomingDeliveryDate = formatDate(tomorrow, "EEEE, MMMM dd");
+
+  // Get the rate that will be active on the upcoming delivery date
+  const upcomingDeliveryLiters = subscription
+    ? getActiveRateForDate(
+        subscription.rate_history || [],
+        tomorrow,
+        subscription.current_rate
+      )
+    : "0";
 
   return (
     <ScrollView
@@ -134,7 +164,7 @@ export const HomeScreen: React.FC = () => {
             <View style={styles.deliveryInfo}>
               <Ionicons name="water" size={20} color={COLORS.primary} />
               <Text style={styles.deliveryText}>
-                {formatLiters(dailyLiters)}
+                {formatLiters(upcomingDeliveryLiters)}
               </Text>
             </View>
             {subscription.subscription_start_date && (
@@ -152,26 +182,35 @@ export const HomeScreen: React.FC = () => {
       <GlassCard style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Quick Actions</Text>
         <View style={styles.actionButtons}>
-          <View style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate("SkipRequest")}
+          >
             <Ionicons
               name="calendar-outline"
               size={24}
               color={COLORS.primary}
             />
             <Text style={styles.actionText}>Skip Delivery</Text>
-          </View>
-          <View style={styles.actionButton}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate("Billing")}
+          >
             <Ionicons
               name="receipt-outline"
               size={24}
               color={COLORS.secondary}
             />
             <Text style={styles.actionText}>View Bill</Text>
-          </View>
-          <View style={styles.actionButton}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate("Profile")}
+          >
             <Ionicons name="settings-outline" size={24} color={COLORS.accent} />
             <Text style={styles.actionText}>Settings</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </GlassCard>
     </ScrollView>
