@@ -10,6 +10,7 @@ interface GlassCardProps {
   tint?: "light" | "dark";
   borderRadius?: number;
   padding?: number;
+  allowOverflow?: boolean;
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({
@@ -19,6 +20,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   tint = "light",
   borderRadius = BORDER_RADIUS.lg,
   padding = SPACING.md,
+  allowOverflow = false,
 }) => {
   // On Android, use solid background for consistency with iOS
   if (Platform.OS === "android") {
@@ -58,7 +60,14 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
   // On iOS, use glassmorphic effect
   return (
-    <View style={[styles.container, { borderRadius }, style]}>
+    <View
+      style={[
+        styles.container,
+        { borderRadius },
+        allowOverflow && styles.containerOverflowVisible,
+        style,
+      ]}
+    >
       <BlurView
         intensity={intensity}
         tint={tint}
@@ -68,6 +77,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
             borderRadius,
             padding,
           },
+          allowOverflow && styles.blurViewOverflowVisible,
         ]}
       >
         {children}
@@ -83,8 +93,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.glassBorder,
     ...SHADOWS.md,
   },
+  containerOverflowVisible: {
+    overflow: "visible",
+  },
   blurView: {
     flex: 1,
+  },
+  blurViewOverflowVisible: {
+    overflow: "visible",
   },
   androidContainer: {
     borderWidth: 1,

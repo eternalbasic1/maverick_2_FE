@@ -1,19 +1,54 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
+  RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuthContext } from "../../context/AuthContext";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
-import { COLORS } from "../../theme/colors";
+import { COLORS, TYPOGRAPHY, SPACING } from "../../theme/colors";
+import { userService } from "../../services/user";
+import { User } from "../../types/api";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { formatDate } from "../../utils/formatting";
 
 export const AdminProfileScreen: React.FC = () => {
-  const { user, logout, isLoading } = useAuthContext();
+  const { logout, updateUser } = useAuthContext();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
+  const loadProfile = async () => {
+    try {
+      const profileData = await userService.getProfile();
+      setUser(profileData);
+      updateUser(profileData); // Update context with fresh data
+    } catch (error: any) {
+      console.error("Error loading profile:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to load profile data"
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadProfile();
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -29,10 +64,13 @@ export const AdminProfileScreen: React.FC = () => {
           style: "destructive",
           onPress: async () => {
             try {
+              setLogoutLoading(true);
               await logout();
             } catch (error) {
               console.error("Logout error:", error);
               Alert.alert("Error", "Failed to logout. Please try again.");
+            } finally {
+              setLogoutLoading(false);
             }
           },
         },
@@ -41,92 +79,208 @@ export const AdminProfileScreen: React.FC = () => {
     );
   };
 
+  const getInitials = (name: string): string => {
+    if (!name) return "A";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (
+      parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
+    ).toUpperCase();
+  };
+
+  const getRoleDisplay = (role: string): string => {
+    return role === "admin" ? "Administrator" : "Customer";
+  };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading profile..." />;
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Admin Profile</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* Header Section */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Admin Profile</Text>
+        <Text style={styles.headerSubtitle}>
+          Manage your administrator account
+        </Text>
+      </View>
+
+      {/* Profile Card with Avatar */}
+      <View style={styles.profileCardWrapper}>
+        <GlassCard style={styles.profileCard} allowOverflow={true}>
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {getInitials(user.full_name)}
+                </Text>
+              </View>
+              <View style={styles.avatarBadge}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={COLORS.success}
+                />
+              </View>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{user.full_name}</Text>
+              <View style={styles.roleBadge}>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={14}
+                  color={COLORS.accent}
+                />
+                <Text style={styles.roleText}>{getRoleDisplay(user.role)}</Text>
+              </View>
+            </View>
+          </View>
+        </GlassCard>
+      </View>
+
+      {/* Contact Information */}
+      <GlassCard style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="call-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Contact Information</Text>
         </View>
-
-        <GlassCard style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user?.full_name?.charAt(0)?.toUpperCase() || "A"}
-              </Text>
-            </View>
+        <View style={styles.infoItem}>
+          <View style={styles.infoLabelContainer}>
+            <Ionicons
+              name="phone-portrait-outline"
+              size={18}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.infoLabel}>Phone Number</Text>
           </View>
+          <Text style={styles.infoValue}>{user.phone_number}</Text>
+        </View>
+      </GlassCard>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.full_name || "Admin"}</Text>
-            <Text style={styles.userPhone}>{user?.phone_number || ""}</Text>
-            <Text style={styles.userEmail}>{user?.email || "No email"}</Text>
-            <View style={styles.adminBadge}>
-              <Text style={styles.adminBadgeText}>ADMIN</Text>
-            </View>
-          </View>
-        </GlassCard>
-
-        <GlassCard style={styles.detailsCard}>
-          <Text style={styles.sectionTitle}>Account Details</Text>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>User ID:</Text>
-            <Text style={styles.detailValue}>{user?.id || "N/A"}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Role:</Text>
-            <Text style={styles.detailValue}>{user?.role || "Admin"}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status:</Text>
-            <Text style={styles.detailValue}>
-              {user?.is_active ? "Active" : "Inactive"}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Created:</Text>
-            <Text style={styles.detailValue}>
-              {user?.created_at
-                ? new Date(user.created_at).toLocaleDateString()
-                : "N/A"}
-            </Text>
-          </View>
-        </GlassCard>
-
-        <GlassCard style={styles.adminCard}>
-          <Text style={styles.sectionTitle}>Admin Privileges</Text>
-
-          <View style={styles.privilegeItem}>
-            <Text style={styles.privilegeText}>
-              • Manage delivery schedules
-            </Text>
-          </View>
-          <View style={styles.privilegeItem}>
-            <Text style={styles.privilegeText}>• View all skip requests</Text>
-          </View>
-          <View style={styles.privilegeItem}>
-            <Text style={styles.privilegeText}>• Generate billing reports</Text>
-          </View>
-          <View style={styles.privilegeItem}>
-            <Text style={styles.privilegeText}>• Access admin dashboard</Text>
-          </View>
-        </GlassCard>
-
-        <View style={styles.logoutContainer}>
-          <GlassButton
-            title="Logout"
-            onPress={handleLogout}
-            loading={isLoading}
-            style={styles.logoutButton}
-            textStyle={styles.logoutButtonText}
+      {/* Account Details */}
+      <GlassCard style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Ionicons
+            name="information-circle-outline"
+            size={20}
+            color={COLORS.secondary}
           />
+          <Text style={styles.sectionTitle}>Account Details</Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.infoItem}>
+          <View style={styles.infoLabelContainer}>
+            <Ionicons
+              name="finger-print-outline"
+              size={18}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.infoLabel}>User ID</Text>
+          </View>
+          <Text style={styles.infoValueSmall}>{user.id}</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.infoItem}>
+          <View style={styles.infoLabelContainer}>
+            <Ionicons
+              name="time-outline"
+              size={18}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.infoLabel}>Timezone</Text>
+          </View>
+          <Text style={styles.infoValue}>{user.timezone}</Text>
+        </View>
+      </GlassCard>
+
+      {/* Account Activity */}
+      <GlassCard style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="calendar-outline" size={20} color={COLORS.accent} />
+          <Text style={styles.sectionTitle}>Account Activity</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <View style={styles.infoLabelContainer}>
+            <Ionicons
+              name="add-circle-outline"
+              size={18}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.infoLabel}>Member Since</Text>
+          </View>
+          <Text style={styles.infoValue}>
+            {formatDate(user.created_at, "MMMM dd, yyyy")}
+          </Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.infoItem}>
+          <View style={styles.infoLabelContainer}>
+            <Ionicons
+              name="refresh-outline"
+              size={18}
+              color={COLORS.textSecondary}
+            />
+            <Text style={styles.infoLabel}>Last Updated</Text>
+          </View>
+          <Text style={styles.infoValue}>
+            {formatDate(user.updated_at, "MMMM dd, yyyy")}
+          </Text>
+        </View>
+      </GlassCard>
+
+      {/* Admin Privileges */}
+      <GlassCard style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={20}
+            color={COLORS.accent}
+          />
+          <Text style={styles.sectionTitle}>Admin Privileges</Text>
+        </View>
+        <View style={styles.privilegeItem}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+          <Text style={styles.privilegeText}>Manage delivery schedules</Text>
+        </View>
+        <View style={styles.privilegeItem}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+          <Text style={styles.privilegeText}>View all skip requests</Text>
+        </View>
+        <View style={styles.privilegeItem}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+          <Text style={styles.privilegeText}>Generate billing reports</Text>
+        </View>
+        <View style={styles.privilegeItem}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+          <Text style={styles.privilegeText}>Access admin dashboard</Text>
+        </View>
+        <View style={styles.privilegeItem}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+          <Text style={styles.privilegeText}>Manage all customers</Text>
+        </View>
+      </GlassCard>
+
+      {/* Logout Button */}
+      <View style={styles.logoutSection}>
+        <GlassButton
+          title="Logout"
+          onPress={handleLogout}
+          loading={logoutLoading}
+          variant="outline"
+          style={styles.logoutButton}
+        />
+      </View>
+    </ScrollView>
   );
 };
 
@@ -135,126 +289,148 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+  content: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xl + 80, // Extra padding for tab bar
   },
   header: {
-    marginBottom: 20,
+    marginBottom: SPACING.xl,
+    paddingTop: SPACING.md,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
+  headerTitle: {
+    ...TYPOGRAPHY.headlineLarge,
     color: COLORS.text,
-    textAlign: "center",
+    marginBottom: SPACING.xs,
+  },
+  headerSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.textSecondary,
+  },
+  profileCardWrapper: {
+    marginBottom: SPACING.lg,
   },
   profileCard: {
-    marginBottom: 20,
-    padding: 20,
+    padding: SPACING.xl,
+    paddingTop: SPACING.xl + 4, // Extra top padding for avatar border
+    paddingBottom: SPACING.xl + 4, // Extra bottom padding for badge
+  },
+  avatarSection: {
     alignItems: "center",
   },
   avatarContainer: {
-    marginBottom: 15,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary,
+    position: "relative",
+    marginBottom: SPACING.md,
+    width: 104, // Account for avatar (100) + border (2*2)
+    height: 104,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.accent,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: COLORS.surface,
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: COLORS.white,
+    ...TYPOGRAPHY.displaySmall,
+    color: "#FFFFFF",
+    fontSize: 30,
+  },
+  avatarBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 2,
   },
   userInfo: {
     alignItems: "center",
   },
   userName: {
-    fontSize: 24,
-    fontWeight: "bold",
+    ...TYPOGRAPHY.headlineLarge,
     color: COLORS.text,
-    marginBottom: 5,
+    marginBottom: SPACING.sm,
+    textAlign: "center",
   },
-  userPhone: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginBottom: 10,
-  },
-  adminBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  adminBadgeText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  detailsCard: {
-    marginBottom: 20,
-    padding: 20,
-  },
-  adminCard: {
-    marginBottom: 30,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.text,
-    marginBottom: 15,
-  },
-  detailRow: {
+  roleBadge: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
+    backgroundColor: COLORS.accent + "10",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 16,
+    gap: SPACING.xs,
   },
-  detailLabel: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  detailValue: {
-    fontSize: 16,
-    color: COLORS.text,
+  roleText: {
+    ...TYPOGRAPHY.labelMedium,
+    color: COLORS.accent,
     fontWeight: "600",
   },
-  privilegeItem: {
-    paddingVertical: 4,
+  sectionCard: {
+    marginBottom: SPACING.lg,
   },
-  privilegeText: {
-    fontSize: 16,
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.titleLarge,
+    color: COLORS.text,
+  },
+  infoItem: {
+    paddingVertical: SPACING.md,
+  },
+  infoLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: SPACING.xs,
+    gap: SPACING.xs,
+  },
+  infoLabel: {
+    ...TYPOGRAPHY.labelMedium,
     color: COLORS.textSecondary,
   },
-  logoutContainer: {
-    marginTop: 20,
+  infoValue: {
+    ...TYPOGRAPHY.bodyLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+    marginLeft: 26, // Align with icon + gap
+  },
+  infoValueSmall: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    fontWeight: "500",
+    marginLeft: 26,
+    fontSize: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.borderLight,
+    marginVertical: SPACING.xs,
+  },
+  privilegeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  privilegeText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  logoutSection: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   logoutButton: {
-    backgroundColor: COLORS.error,
     borderColor: COLORS.error,
-  },
-  logoutButtonText: {
-    color: COLORS.white,
-    fontWeight: "bold",
   },
 });
