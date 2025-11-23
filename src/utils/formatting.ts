@@ -305,3 +305,22 @@ export const getCurrentActiveRate = (
   const today = new Date();
   return getActiveRateForDate(rateHistory, today, fallbackRate);
 };
+
+// Calculate average of all rate history values
+export const getAverageRate = (rateHistory: Rate[]): string => {
+  if (!rateHistory || rateHistory.length === 0) {
+    return "0";
+  }
+
+  // Sum all daily_liters values
+  const sum = rateHistory.reduce((acc, rate) => {
+    const liters = parseFloat(rate.daily_liters) || 0;
+    return acc + liters;
+  }, 0);
+
+  // Calculate average
+  const average = sum / rateHistory.length;
+
+  // Return formatted to 2 decimal places
+  return average.toFixed(2);
+};

@@ -24,6 +24,7 @@ import {
   formatLiters,
   getCurrentActiveRate,
   getActiveRateForDate,
+  getAverageRate,
 } from "../../utils/formatting";
 import { CustomerTabParamList } from "../../navigation/CustomerNavigator";
 
@@ -132,12 +133,9 @@ export const HomeScreen: React.FC = () => {
     return <LoadingSpinner message="Loading subscription..." />;
   }
 
-  // Get current active rate from rate_history based on current date
-  const dailyLiters = subscription
-    ? getCurrentActiveRate(
-        subscription.rate_history || [],
-        subscription.current_rate
-      )
+  // Calculate average of all rate history values
+  const averageLiters = subscription
+    ? getAverageRate(subscription.rate_history || [])
     : "0";
   const subscriptionDays = subscription
     ? Math.floor(
@@ -189,9 +187,9 @@ export const HomeScreen: React.FC = () => {
               <View style={styles.statItem}>
                 <Ionicons name="water" size={24} color={COLORS.primary} />
                 <Text style={styles.statValue}>
-                  {formatLiters(dailyLiters)}
+                  {formatLiters(averageLiters)}
                 </Text>
-                <Text style={styles.statLabel}>Daily</Text>
+                <Text style={styles.statLabel}>Average</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons name="calendar" size={24} color={COLORS.secondary} />

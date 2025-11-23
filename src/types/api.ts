@@ -20,6 +20,7 @@ export interface Subscription {
   is_active: boolean;
   subscription_start_date: string;
   subscription_end_date: string | null;
+  milk_type: "buffalo" | "cow";
   current_rate: string;
   rate_history: Rate[];
   created_at: string;
@@ -52,6 +53,7 @@ export interface BillingHistory {
   };
   total_days_delivered: number;
   total_liters_delivered: number;
+  total_amount: number;
   rate_breakdown: RateBreakdown[];
 }
 
@@ -62,6 +64,16 @@ export interface RateBreakdown {
   effective_to: string | null;
   days_delivered: number;
   total_liters: number;
+  pricing?: PricingDetails;
+}
+
+export interface PricingDetails {
+  liters: string;
+  price_per_day: string;
+  pricing_effective_from: string;
+  pricing_effective_to: string | null;
+  days_count: number;
+  total_amount: number;
 }
 
 // Admin Delivery Schedule
@@ -196,11 +208,17 @@ export interface ForgotPasswordWithOTPFormData {
 export interface CreateSubscriptionData {
   daily_liters: string;
   subscription_start_date: string;
+  milk_type?: "buffalo" | "cow"; // Optional, defaults to "buffalo" on backend
 }
 
 export interface UpdateRateData {
   new_daily_liters: string;
   effective_from: string;
+}
+
+export interface UpdateSubscriptionData {
+  subscription_end_date?: string | null;
+  milk_type?: "buffalo" | "cow";
 }
 
 export interface CreateSkipRequestData {

@@ -8,7 +8,10 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -31,9 +34,17 @@ export const BillingHistoryScreen: React.FC = () => {
     date.setMonth(date.getMonth() - 1);
     return date.toISOString().split("T")[0];
   });
+  const [startDateObj, setStartDateObj] = useState(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 1);
+    return date;
+  });
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
+  const [endDateObj, setEndDateObj] = useState(new Date());
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const loadBillingHistory = async () => {
     try {
@@ -122,8 +133,65 @@ export const BillingHistoryScreen: React.FC = () => {
             {formatLiters(billingHistory.total_liters_delivered)}
           </Text>
         </View>
+        {billingHistory.total_amount !== undefined && (
+          <View style={[styles.summaryRow, styles.summaryRowLast]}>
+            <Text style={styles.summaryLabel}>Total Amount:</Text>
+            <Text style={[styles.summaryValue, styles.totalAmount]}>
+              ₹{billingHistory.total_amount.toFixed(2)}
+            </Text>
+          </View>
+        )}
       </GlassCard>
 
+      {/* Pricing Details Section */}
+      {billingHistory.rate_breakdown &&
+      billingHistory.rate_breakdown.length > 0 &&
+      billingHistory.rate_breakdown.some((bd) => bd.pricing) ? (
+        <GlassCard style={styles.pricingCard}>
+          <Text style={styles.cardTitle}>Pricing Details</Text>
+          {billingHistory.rate_breakdown.map((breakdown, index) => {
+            if (!breakdown.pricing) return null;
+            const pricing = breakdown.pricing;
+            return (
+              <View key={breakdown.rate_id || index} style={styles.pricingItem}>
+                <View style={styles.pricingHeader}>
+                  <View style={styles.pricingInfo}>
+                    <Text style={styles.pricingRate}>
+                      {formatLiters(pricing.liters)}/day @ ₹
+                      {pricing.price_per_day}/day
+                    </Text>
+                    <Text style={styles.pricingPeriod}>
+                      {formatDate(pricing.pricing_effective_from)} -{" "}
+                      {pricing.pricing_effective_to
+                        ? formatDate(pricing.pricing_effective_to)
+                        : "Present"}
+                    </Text>
+                  </View>
+                  <Text style={styles.pricingAmount}>
+                    ₹{pricing.total_amount.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.pricingDetails}>
+                  <View style={styles.pricingDetailRow}>
+                    <Text style={styles.pricingDetailLabel}>Days:</Text>
+                    <Text style={styles.pricingDetailValue}>
+                      {pricing.days_count} days
+                    </Text>
+                  </View>
+                  <View style={styles.pricingDetailRow}>
+                    <Text style={styles.pricingDetailLabel}>Rate:</Text>
+                    <Text style={styles.pricingDetailValue}>
+                      ₹{pricing.price_per_day}/day
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </GlassCard>
+      ) : null}
+
+      {/* Rate Breakdown Section */}
       {billingHistory.rate_breakdown &&
       billingHistory.rate_breakdown.length > 0 ? (
         <GlassCard style={styles.breakdownCard}>
@@ -171,20 +239,146 @@ export const BillingHistoryScreen: React.FC = () => {
             <Text style={styles.modalTitle}>Select Date Range</Text>
 
             <Text style={styles.inputLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={startDate}
-              onChangeText={setStartDate}
-            />
+            <TouchableOpacity
+              onPress={() => setShowStartDatePicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {startDate || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select Start Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={startDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleStartDateChange}
+                        maximumDate={endDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowStartDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleStartDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={startDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleStartDateChange}
+                    maximumDate={endDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <Text style={styles.inputLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={endDate}
-              onChangeText={setEndDate}
-            />
+            <TouchableOpacity
+              onPress={() => setShowEndDatePicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {endDate || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select End Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={endDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleEndDateChange}
+                        minimumDate={startDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowEndDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleEndDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={endDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleEndDateChange}
+                    minimumDate={startDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <View style={styles.modalButtons}>
               <GlassButton
@@ -246,6 +440,67 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  summaryRowLast: {
+    borderBottomWidth: 0,
+  },
+  totalAmount: {
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  pricingCard: {
+    marginBottom: SPACING.lg,
+  },
+  pricingItem: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  pricingHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: SPACING.sm,
+  },
+  pricingInfo: {
+    flex: 1,
+  },
+  pricingRate: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  pricingPeriod: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+  pricingAmount: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+  pricingDetails: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  pricingDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: SPACING.xs,
+  },
+  pricingDetailLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+  },
+  pricingDetailValue: {
+    ...TYPOGRAPHY.labelSmall,
     color: COLORS.text,
     fontWeight: "600",
   },
@@ -319,5 +574,93 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  datePickerButton: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

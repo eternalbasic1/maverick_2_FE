@@ -10,7 +10,9 @@ import {
   RefreshControl,
   FlatList,
   TouchableOpacity,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { GlassCard } from "../../components/glassmorphism/GlassCard";
 import { GlassButton } from "../../components/glassmorphism/GlassButton";
@@ -40,9 +42,17 @@ export const BillingReportScreen: React.FC = () => {
     date.setMonth(date.getMonth() - 1);
     return date.toISOString().split("T")[0];
   });
+  const [startDateObj, setStartDateObj] = useState(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 1);
+    return date;
+  });
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
+  const [endDateObj, setEndDateObj] = useState(new Date());
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const loadCustomers = async () => {
     try {
@@ -354,22 +364,146 @@ export const BillingReportScreen: React.FC = () => {
             <Text style={styles.modalTitle}>Set Date Range</Text>
 
             <Text style={styles.inputLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholderTextColor={COLORS.textTertiary}
-            />
+            <TouchableOpacity
+              onPress={() => setShowStartDatePicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {startDate || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select Start Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={startDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleStartDateChange}
+                        maximumDate={endDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowStartDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleStartDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={startDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleStartDateChange}
+                    maximumDate={endDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <Text style={styles.inputLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholderTextColor={COLORS.textTertiary}
-            />
+            <TouchableOpacity
+              onPress={() => setShowEndDatePicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {endDate || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showEndDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select End Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={endDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleEndDateChange}
+                        minimumDate={startDateObj}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowEndDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleEndDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={endDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleEndDateChange}
+                    minimumDate={startDateObj}
+                  />
+                )}
+              </View>
+            )}
 
             <View style={styles.modalButtons}>
               <GlassButton

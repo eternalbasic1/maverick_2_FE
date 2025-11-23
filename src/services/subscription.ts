@@ -5,6 +5,7 @@ import {
   BillingHistory,
   CreateSubscriptionData,
   UpdateRateData,
+  UpdateSubscriptionData,
 } from "../types/api";
 
 export const subscriptionService = {
@@ -73,6 +74,14 @@ export const subscriptionService = {
   // Reactivate subscription
   reactivateSubscription: async (): Promise<{ message: string }> => {
     const response = await api.post("/subscription/reactivate/");
+    return response.data;
+  },
+
+  // Update subscription (PUT /subscription/)
+  updateSubscription: async (
+    data: UpdateSubscriptionData
+  ): Promise<Subscription> => {
+    const response = await api.put("/subscription/", data);
     return response.data;
   },
 };

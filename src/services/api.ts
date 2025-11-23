@@ -11,6 +11,17 @@ const api = axios.create({
 });
 console.log("🔧 API_CONFIG.BASE_URL", API_CONFIG.BASE_URL);
 
+// Global logout handler - will be set by AuthContext
+let globalLogoutHandler: (() => Promise<void>) | null = null;
+
+export const setLogoutHandler = (handler: () => Promise<void>) => {
+  globalLogoutHandler = handler;
+};
+
+export const clearLogoutHandler = () => {
+  globalLogoutHandler = null;
+};
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
@@ -27,7 +38,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and token expiration
 api.interceptors.response.use(
   (response: AxiosResponse) => {
     console.log("✅ Response received:", response.status, response.config.url);
@@ -40,8 +51,40 @@ api.interceptors.response.use(
     console.error("❌ Error Data:", error.response?.data);
 
     const originalRequest = error.config as any;
+    const errorData = error.response?.data as any;
+    const errorStatus = error.response?.status;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle token expiration (403 with "Token expired" message)
+    if (
+      errorStatus === 403 &&
+      (errorData?.detail === "Token expired" ||
+        errorData?.error === "Token expired" ||
+        errorData?.message === "Token expired")
+    ) {
+      console.log("🔒 Token expired detected - logging out user");
+
+      // Clear tokens immediately
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.ACCESS_TOKEN,
+        STORAGE_KEYS.REFRESH_TOKEN,
+        STORAGE_KEYS.USER_DATA,
+      ]);
+
+      // Call global logout handler if available
+      if (globalLogoutHandler) {
+        try {
+          await globalLogoutHandler();
+        } catch (logoutError) {
+          console.error("❌ Error during automatic logout:", logoutError);
+        }
+      }
+
+      // Return a rejected promise to prevent the original request from continuing
+      return Promise.reject(error);
+    }
+
+    // Handle 401 Unauthorized - try to refresh token
+    if (errorStatus === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
@@ -70,6 +113,15 @@ api.interceptors.response.use(
           STORAGE_KEYS.REFRESH_TOKEN,
           STORAGE_KEYS.USER_DATA,
         ]);
+
+        // Call global logout handler if available
+        if (globalLogoutHandler) {
+          try {
+            await globalLogoutHandler();
+          } catch (logoutError) {
+            console.error("❌ Error during automatic logout:", logoutError);
+          }
+        }
       }
     }
 

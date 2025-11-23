@@ -32,11 +32,19 @@ export const SubscriptionScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showUpdateSubscriptionModal, setShowUpdateSubscriptionModal] =
+    useState(false);
   const [dailyLiters, setDailyLiters] = useState("");
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [startDateObj, setStartDateObj] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [milkType, setMilkType] = useState<"buffalo" | "cow">("buffalo");
   const [newDailyLiters, setNewDailyLiters] = useState("");
+  const [updateMilkType, setUpdateMilkType] = useState<"buffalo" | "cow">(
+    "buffalo"
+  );
   const getTomorrowDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -88,10 +96,12 @@ export const SubscriptionScreen: React.FC = () => {
       await subscriptionService.createSubscription({
         daily_liters: dailyLiters,
         subscription_start_date: startDate,
+        milk_type: milkType,
       });
       Alert.alert("Success", "Subscription created successfully!");
       setShowCreateModal(false);
       setDailyLiters("");
+      setMilkType("buffalo");
       loadSubscription();
     } catch (error: any) {
       console.error("Error creating subscription:", error);
@@ -102,6 +112,54 @@ export const SubscriptionScreen: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleUpdateSubscription = async () => {
+    setSubmitting(true);
+    try {
+      await subscriptionService.updateSubscription({
+        milk_type: updateMilkType,
+      });
+      Alert.alert("Success", "Subscription updated successfully!");
+      setShowUpdateSubscriptionModal(false);
+      loadSubscription();
+    } catch (error: any) {
+      console.error("Error updating subscription:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to update subscription"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowStartDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+
+      if (selected < today) {
+        Alert.alert(
+          "Invalid Date",
+          "Start date cannot be in the past. Please select today or a future date."
+        );
+        return;
+      }
+
+      setStartDateObj(selectedDate);
+      setStartDate(selectedDate.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleStartDateDone = () => {
+    setShowStartDatePicker(false);
   };
 
   const handleEffectiveFromChange = (event: any, selectedDate?: Date) => {
@@ -201,7 +259,10 @@ export const SubscriptionScreen: React.FC = () => {
           />
           <GlassButton
             title="Create Subscription"
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => {
+              setMilkType("buffalo");
+              setShowCreateModal(true);
+            }}
             style={styles.createButton}
           />
         </GlassCard>
@@ -211,8 +272,12 @@ export const SubscriptionScreen: React.FC = () => {
             <Text style={styles.cardTitle}>Current Subscription</Text>
             <View style={styles.subscriptionInfo}>
               <View style={styles.infoRow}>
-                <Ionicons name="water" size={20} color={COLORS.primary} />
-                <Text style={styles.infoLabel}>Daily Amount:</Text>
+                <Ionicons
+                  name="arrow-forward"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.infoLabel}>Quantity:</Text>
                 <Text style={styles.infoValue}>
                   {formatLiters(
                     getCurrentActiveRate(
@@ -247,6 +312,15 @@ export const SubscriptionScreen: React.FC = () => {
                   ]}
                 >
                   {subscription.is_active ? "Active" : "Inactive"}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Ionicons name="water" size={20} color={COLORS.accent} />
+                <Text style={styles.infoLabel}>Milk Type:</Text>
+                <Text style={styles.infoValue}>
+                  {subscription.milk_type === "buffalo"
+                    ? "Buffalo Milk"
+                    : "Cow Milk"}
                 </Text>
               </View>
             </View>
@@ -292,6 +366,15 @@ export const SubscriptionScreen: React.FC = () => {
               onPress={() => setShowUpdateModal(true)}
               style={styles.actionButton}
             />
+            {/* <GlassButton
+              title="Update Milk Type"
+              onPress={() => {
+                setUpdateMilkType(subscription.milk_type);
+                setShowUpdateSubscriptionModal(true);
+              }}
+              variant="outline"
+              style={styles.actionButton}
+            /> */}
           </GlassCard>
         </>
       )}
@@ -318,13 +401,133 @@ export const SubscriptionScreen: React.FC = () => {
             />
 
             <Text style={styles.inputLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={COLORS.textTertiary}
-              value={startDate}
-              onChangeText={setStartDate}
-            />
+            <TouchableOpacity
+              onPress={() => setShowStartDatePicker(true)}
+              style={styles.datePickerButton}
+            >
+              <View style={styles.datePickerContent}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={styles.datePickerIcon}
+                />
+                <Text style={styles.datePickerText}>
+                  {startDate || "Select date"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showStartDatePicker && (
+              <View style={styles.datePickerContainer}>
+                {Platform.OS === "ios" ? (
+                  <>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerHeaderText}>
+                        Select Start Date
+                      </Text>
+                    </View>
+                    <View style={styles.datePickerWrapper}>
+                      <DateTimePicker
+                        value={startDateObj}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleStartDateChange}
+                        minimumDate={new Date()}
+                        textColor={COLORS.text}
+                        themeVariant="light"
+                        style={styles.datePicker}
+                        locale="en_US"
+                      />
+                    </View>
+                    <View style={styles.iosPickerButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowStartDatePicker(false)}
+                        style={styles.iosPickerButton}
+                      >
+                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleStartDateDone}
+                        style={[
+                          styles.iosPickerButton,
+                          styles.iosPickerButtonPrimary,
+                        ]}
+                      >
+                        <Text style={styles.iosPickerButtonTextPrimary}>
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <DateTimePicker
+                    value={startDateObj}
+                    mode="date"
+                    display="default"
+                    onChange={handleStartDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Milk Type</Text>
+            <View style={styles.milkTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.milkTypeOption,
+                  milkType === "buffalo" && styles.milkTypeOptionActive,
+                ]}
+                onPress={() => setMilkType("buffalo")}
+              >
+                <Ionicons
+                  name={
+                    milkType === "buffalo"
+                      ? "radio-button-on"
+                      : "radio-button-off"
+                  }
+                  size={20}
+                  color={
+                    milkType === "buffalo"
+                      ? COLORS.primary
+                      : COLORS.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.milkTypeText,
+                    milkType === "buffalo" && styles.milkTypeTextActive,
+                  ]}
+                >
+                  Buffalo Milk
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.milkTypeOption,
+                  milkType === "cow" && styles.milkTypeOptionActive,
+                ]}
+                onPress={() => setMilkType("cow")}
+              >
+                <Ionicons
+                  name={
+                    milkType === "cow" ? "radio-button-on" : "radio-button-off"
+                  }
+                  size={20}
+                  color={
+                    milkType === "cow" ? COLORS.primary : COLORS.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.milkTypeText,
+                    milkType === "cow" && styles.milkTypeTextActive,
+                  ]}
+                >
+                  Cow Milk
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.modalButtons}>
               <GlassButton
@@ -456,6 +659,97 @@ export const SubscriptionScreen: React.FC = () => {
               <GlassButton
                 title="Update"
                 onPress={handleUpdateRate}
+                loading={submitting}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Subscription Modal */}
+      <Modal
+        visible={showUpdateSubscriptionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUpdateSubscriptionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Milk Type</Text>
+
+            <Text style={styles.inputLabel}>Select Milk Type</Text>
+            <View style={styles.milkTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.milkTypeOption,
+                  updateMilkType === "buffalo" && styles.milkTypeOptionActive,
+                ]}
+                onPress={() => setUpdateMilkType("buffalo")}
+              >
+                <Ionicons
+                  name={
+                    updateMilkType === "buffalo"
+                      ? "radio-button-on"
+                      : "radio-button-off"
+                  }
+                  size={20}
+                  color={
+                    updateMilkType === "buffalo"
+                      ? COLORS.primary
+                      : COLORS.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.milkTypeText,
+                    updateMilkType === "buffalo" && styles.milkTypeTextActive,
+                  ]}
+                >
+                  Buffalo Milk
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.milkTypeOption,
+                  updateMilkType === "cow" && styles.milkTypeOptionActive,
+                ]}
+                onPress={() => setUpdateMilkType("cow")}
+              >
+                <Ionicons
+                  name={
+                    updateMilkType === "cow"
+                      ? "radio-button-on"
+                      : "radio-button-off"
+                  }
+                  size={20}
+                  color={
+                    updateMilkType === "cow"
+                      ? COLORS.primary
+                      : COLORS.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.milkTypeText,
+                    updateMilkType === "cow" && styles.milkTypeTextActive,
+                  ]}
+                >
+                  Cow Milk
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <GlassButton
+                title="Cancel"
+                onPress={() => setShowUpdateSubscriptionModal(false)}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <GlassButton
+                title="Update"
+                onPress={handleUpdateSubscription}
                 loading={submitting}
                 style={styles.modalButton}
               />
@@ -698,6 +992,33 @@ const styles = StyleSheet.create({
   iosPickerButtonTextPrimary: {
     ...TYPOGRAPHY.labelLarge,
     color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  milkTypeContainer: {
+    marginTop: SPACING.xs,
+    gap: SPACING.sm,
+  },
+  milkTypeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    padding: SPACING.md,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  milkTypeOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  milkTypeText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
+    flex: 1,
+  },
+  milkTypeTextActive: {
+    color: COLORS.text,
     fontWeight: "600",
   },
 });

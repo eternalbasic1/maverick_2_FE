@@ -1,6 +1,13 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  ReactNode,
+  useEffect,
+  useRef,
+} from "react";
 import { useAuth } from "../hooks/useAuth";
 import { User } from "../types/api";
+import { setLogoutHandler, clearLogoutHandler } from "../services/api";
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +32,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const auth = useAuth();
+  const logoutRef = useRef(auth.logout);
+
+  // Keep logout function reference up to date
+  useEffect(() => {
+    logoutRef.current = auth.logout;
+  }, [auth.logout]);
+
+  // Register logout handler with API service for automatic token expiration handling
+  useEffect(() => {
+    const handleLogout = async () => {
+      await logoutRef.current();
+    };
+
+    setLogoutHandler(handleLogout);
+
+    // Cleanup on unmount
+    return () => {
+      clearLogoutHandler();
+    };
+  }, []);
+
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 };
 
