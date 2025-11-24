@@ -36,23 +36,25 @@ export const BillingReportScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [startDate, setStartDate] = useState(() => {
+  const getMonthStartDate = () => {
     const date = new Date();
-    date.setMonth(date.getMonth() - 1);
-    return date.toISOString().split("T")[0];
-  });
-  const [startDateObj, setStartDateObj] = useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 1);
+    date.setDate(1);
     return date;
+  };
+  const getTodayDate = () => {
+    return new Date();
+  };
+  const [startDate, setStartDate] = useState(() => {
+    return getMonthStartDate().toISOString().split("T")[0];
   });
+  const [startDateObj, setStartDateObj] = useState(() => getMonthStartDate());
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
+    return getTodayDate().toISOString().split("T")[0];
   });
-  const [endDateObj, setEndDateObj] = useState(new Date());
+  const [endDateObj, setEndDateObj] = useState(() => getTodayDate());
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showCustomerList, setShowCustomerList] = useState(false);
 
   const loadCustomers = async () => {
     try {
@@ -103,6 +105,62 @@ export const BillingReportScreen: React.FC = () => {
     loadBillingReport();
   };
 
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowStartDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const end = new Date(endDateObj);
+      end.setHours(0, 0, 0, 0);
+
+      if (selected > end) {
+        Alert.alert(
+          "Invalid Date",
+          "Start date cannot be after end date. Please select an earlier date."
+        );
+        return;
+      }
+
+      setStartDateObj(selectedDate);
+      setStartDate(selectedDate.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleStartDateDone = () => {
+    setShowStartDatePicker(false);
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowEndDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const start = new Date(startDateObj);
+      start.setHours(0, 0, 0, 0);
+
+      if (selected < start) {
+        Alert.alert(
+          "Invalid Date",
+          "End date cannot be before start date. Please select a later date."
+        );
+        return;
+      }
+
+      setEndDateObj(selectedDate);
+      setEndDate(selectedDate.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleEndDateDone = () => {
+    setShowEndDatePicker(false);
+  };
+
   const handleApplyFilter = () => {
     setShowFilterModal(false);
     loadBillingReport();
@@ -110,13 +168,6 @@ export const BillingReportScreen: React.FC = () => {
 
   const handleCustomerSelect = (customer: User) => {
     setSelectedCustomer(customer);
-    setShowCustomerModal(false);
-    // Automatically load report when customer is selected
-    if (startDate && endDate) {
-      setTimeout(() => {
-        loadBillingReport();
-      }, 100);
-    }
   };
 
   if (loading && !billingReport) {
@@ -134,26 +185,8 @@ export const BillingReportScreen: React.FC = () => {
       <GlassCard style={styles.filterCard}>
         <Text style={styles.cardTitle}>Billing Report</Text>
         <View style={styles.filterActions}>
-          <TouchableOpacity
-            style={styles.customerSelector}
-            onPress={() => setShowCustomerModal(true)}
-          >
-            <Ionicons name="person" size={20} color={COLORS.primary} />
-            <Text style={styles.customerSelectorText}>
-              {selectedCustomer
-                ? `${selectedCustomer.full_name} (${formatPhoneNumberDisplay(
-                    selectedCustomer.phone_number
-                  )})`
-                : "Select Customer"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={16}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
           <GlassButton
-            title="Set Dates"
+            title="Set Filters"
             onPress={() => setShowFilterModal(true)}
             variant="outline"
             style={styles.filterButton}
@@ -198,8 +231,92 @@ export const BillingReportScreen: React.FC = () => {
                 {formatLiters(billingReport.summary.total_delivered_liters)}
               </Text>
             </View>
+            {billingReport.summary.total_amount !== undefined && (
+              <View style={[styles.summaryRow, styles.summaryRowLast]}>
+                <Text style={styles.summaryLabel}>Total Amount:</Text>
+                <Text style={[styles.summaryValue, styles.totalAmount]}>
+                  ₹{billingReport.summary.total_amount.toFixed(2)}
+                </Text>
+              </View>
+            )}
           </GlassCard>
 
+          {/* Pricing Details Section */}
+          {billingReport.rate_breakdown &&
+          billingReport.rate_breakdown.length > 0 &&
+          billingReport.rate_breakdown.some((bd) => bd.pricing) ? (
+            <GlassCard style={styles.pricingCard}>
+              <Text style={styles.cardTitle}>Pricing Details</Text>
+              {billingReport.rate_breakdown.map((breakdown, index) => {
+                if (!breakdown.pricing) return null;
+                const pricing = breakdown.pricing;
+                return (
+                  <View
+                    key={breakdown.rate_id || index}
+                    style={styles.pricingItem}
+                  >
+                    <View style={styles.pricingHeader}>
+                      <View style={styles.pricingInfo}>
+                        <View style={styles.pricingTitleRow}>
+                          <Text style={styles.pricingRate}>
+                            {formatLiters(pricing.daily_liters)}/day
+                          </Text>
+                          <View style={styles.milkTypeBadge}>
+                            <Text style={styles.milkTypeBadgeText}>
+                              {pricing.milk_type === "buffalo"
+                                ? "Buffalo"
+                                : "Cow"}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.pricingSubtext}>
+                          ₹{pricing.price_per_liter}/L × {pricing.daily_liters}L
+                          = ₹{pricing.price_per_day}/day
+                        </Text>
+                        {breakdown.effective_from && (
+                          <Text style={styles.pricingPeriod}>
+                            {formatDate(breakdown.effective_from)} -{" "}
+                            {breakdown.effective_to
+                              ? formatDate(breakdown.effective_to)
+                              : "Present"}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={styles.pricingAmount}>
+                        ₹{pricing.total_amount.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.pricingDetails}>
+                      <View style={styles.pricingDetailRow}>
+                        <Text style={styles.pricingDetailLabel}>Days:</Text>
+                        <Text style={styles.pricingDetailValue}>
+                          {pricing.days_count} days
+                        </Text>
+                      </View>
+                      <View style={styles.pricingDetailRow}>
+                        <Text style={styles.pricingDetailLabel}>
+                          Price/Liter:
+                        </Text>
+                        <Text style={styles.pricingDetailValue}>
+                          ₹{pricing.price_per_liter}
+                        </Text>
+                      </View>
+                      <View style={styles.pricingDetailRow}>
+                        <Text style={styles.pricingDetailLabel}>
+                          Daily Rate:
+                        </Text>
+                        <Text style={styles.pricingDetailValue}>
+                          ₹{pricing.price_per_day}/day
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </GlassCard>
+          ) : null}
+
+          {/* Rate Breakdown Section */}
           {billingReport.rate_breakdown &&
           billingReport.rate_breakdown.length > 0 ? (
             <GlassCard style={styles.breakdownCard}>
@@ -225,8 +342,14 @@ export const BillingReportScreen: React.FC = () => {
                       Rate: {breakdown.delivery_success_rate}
                     </Text>
                     <Text style={styles.breakdownDetails}>
-                      Delivered: {formatLiters(breakdown.delivered_liters)}
+                      Delivered: {formatLiters(breakdown.delivered_liters)} (
+                      {breakdown.days_delivered || 0} days)
                     </Text>
+                    {breakdown.total_liters !== undefined && (
+                      <Text style={styles.breakdownDetails}>
+                        Total Liters: {formatLiters(breakdown.total_liters)}
+                      </Text>
+                    )}
                   </View>
                 </View>
               ))}
@@ -295,64 +418,7 @@ export const BillingReportScreen: React.FC = () => {
         </GlassCard>
       )}
 
-      {/* Customer Selection Modal */}
-      <Modal
-        visible={showCustomerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCustomerModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Customer</Text>
-              <TouchableOpacity
-                onPress={() => setShowCustomerModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={customers}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.customerItem,
-                    selectedCustomer?.id === item.id && styles.selectedCustomer,
-                  ]}
-                  onPress={() => handleCustomerSelect(item)}
-                >
-                  <View style={styles.customerItemContent}>
-                    <Text style={styles.customerItemName}>
-                      {item.full_name}
-                    </Text>
-                    <Text style={styles.customerItemPhone}>
-                      {formatPhoneNumberDisplay(item.phone_number)}
-                    </Text>
-                  </View>
-                  {selectedCustomer?.id === item.id && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={COLORS.primary}
-                    />
-                  )}
-                </TouchableOpacity>
-              )}
-              style={styles.customerList}
-              ListEmptyComponent={
-                <View style={styles.emptyList}>
-                  <Text style={styles.emptyListText}>No customers found</Text>
-                </View>
-              }
-            />
-          </GlassCard>
-        </View>
-      </Modal>
-
-      {/* Date Range Modal */}
+      {/* Combined Filter Modal */}
       <Modal
         visible={showFilterModal}
         transparent
@@ -360,151 +426,240 @@ export const BillingReportScreen: React.FC = () => {
         onRequestClose={() => setShowFilterModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Set Date Range</Text>
-
-            <Text style={styles.inputLabel}>Start Date</Text>
-            <TouchableOpacity
-              onPress={() => setShowStartDatePicker(true)}
-              style={styles.datePickerButton}
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Set Filters</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowFilterModal(false);
+                  setShowCustomerList(false);
+                }}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.modalScrollView}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              bounces={false}
             >
-              <View style={styles.datePickerContent}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={20}
-                  color={COLORS.textSecondary}
-                  style={styles.datePickerIcon}
-                />
-                <Text style={styles.datePickerText}>
-                  {startDate || "Select date"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            {showStartDatePicker && (
-              <View style={styles.datePickerContainer}>
-                {Platform.OS === "ios" ? (
-                  <>
-                    <View style={styles.datePickerHeader}>
-                      <Text style={styles.datePickerHeaderText}>
-                        Select Start Date
-                      </Text>
-                    </View>
-                    <View style={styles.datePickerWrapper}>
-                      <DateTimePicker
-                        value={startDateObj}
-                        mode="date"
-                        display="spinner"
-                        onChange={handleStartDateChange}
-                        maximumDate={endDateObj}
-                        textColor={COLORS.text}
-                        themeVariant="light"
-                        style={styles.datePicker}
-                        locale="en_US"
-                      />
-                    </View>
-                    <View style={styles.iosPickerButtons}>
-                      <TouchableOpacity
-                        onPress={() => setShowStartDatePicker(false)}
-                        style={styles.iosPickerButton}
-                      >
-                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleStartDateDone}
-                        style={[
-                          styles.iosPickerButton,
-                          styles.iosPickerButtonPrimary,
-                        ]}
-                      >
-                        <Text style={styles.iosPickerButtonTextPrimary}>
-                          Done
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <DateTimePicker
-                    value={startDateObj}
-                    mode="date"
-                    display="default"
-                    onChange={handleStartDateChange}
-                    maximumDate={endDateObj}
+              <Text style={styles.inputLabel}>Select Customer</Text>
+              <TouchableOpacity
+                style={styles.customerDropdown}
+                onPress={() => setShowCustomerList(!showCustomerList)}
+              >
+                <View style={styles.customerDropdownContent}>
+                  <Ionicons name="person" size={20} color={COLORS.primary} />
+                  <Text style={styles.customerDropdownText}>
+                    {selectedCustomer
+                      ? `${
+                          selectedCustomer.full_name
+                        } (${formatPhoneNumberDisplay(
+                          selectedCustomer.phone_number
+                        )})`
+                      : "Select Customer"}
+                  </Text>
+                  <Ionicons
+                    name={showCustomerList ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={COLORS.textSecondary}
                   />
-                )}
-              </View>
-            )}
-
-            <Text style={styles.inputLabel}>End Date</Text>
-            <TouchableOpacity
-              onPress={() => setShowEndDatePicker(true)}
-              style={styles.datePickerButton}
-            >
-              <View style={styles.datePickerContent}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={20}
-                  color={COLORS.textSecondary}
-                  style={styles.datePickerIcon}
-                />
-                <Text style={styles.datePickerText}>
-                  {endDate || "Select date"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            {showEndDatePicker && (
-              <View style={styles.datePickerContainer}>
-                {Platform.OS === "ios" ? (
-                  <>
-                    <View style={styles.datePickerHeader}>
-                      <Text style={styles.datePickerHeaderText}>
-                        Select End Date
-                      </Text>
-                    </View>
-                    <View style={styles.datePickerWrapper}>
-                      <DateTimePicker
-                        value={endDateObj}
-                        mode="date"
-                        display="spinner"
-                        onChange={handleEndDateChange}
-                        minimumDate={startDateObj}
-                        textColor={COLORS.text}
-                        themeVariant="light"
-                        style={styles.datePicker}
-                        locale="en_US"
-                      />
-                    </View>
-                    <View style={styles.iosPickerButtons}>
+                </View>
+              </TouchableOpacity>
+              {showCustomerList && (
+                <View style={styles.customerListContainer}>
+                  <FlatList
+                    data={customers}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
                       <TouchableOpacity
-                        onPress={() => setShowEndDatePicker(false)}
-                        style={styles.iosPickerButton}
-                      >
-                        <Text style={styles.iosPickerButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleEndDateDone}
                         style={[
-                          styles.iosPickerButton,
-                          styles.iosPickerButtonPrimary,
+                          styles.customerItem,
+                          selectedCustomer?.id === item.id &&
+                            styles.selectedCustomer,
                         ]}
+                        onPress={() => {
+                          handleCustomerSelect(item);
+                          setShowCustomerList(false);
+                        }}
                       >
-                        <Text style={styles.iosPickerButtonTextPrimary}>
-                          Done
-                        </Text>
+                        <View style={styles.customerItemContent}>
+                          <Text style={styles.customerItemName}>
+                            {item.full_name}
+                          </Text>
+                          <Text style={styles.customerItemPhone}>
+                            {formatPhoneNumberDisplay(item.phone_number)}
+                          </Text>
+                        </View>
+                        {selectedCustomer?.id === item.id && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={20}
+                            color={COLORS.success}
+                          />
+                        )}
                       </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <DateTimePicker
-                    value={endDateObj}
-                    mode="date"
-                    display="default"
-                    onChange={handleEndDateChange}
-                    minimumDate={startDateObj}
+                    )}
+                    style={styles.customerList}
+                    nestedScrollEnabled={true}
+                    ListEmptyComponent={
+                      <View style={styles.emptyList}>
+                        <Text style={styles.emptyListText}>
+                          No customers found
+                        </Text>
+                      </View>
+                    }
                   />
-                )}
-              </View>
-            )}
+                </View>
+              )}
 
+              <Text style={styles.inputLabel}>Start Date</Text>
+
+              <Text style={styles.inputLabel}>Start Date</Text>
+              <TouchableOpacity
+                onPress={() => setShowStartDatePicker(true)}
+                style={styles.datePickerButton}
+              >
+                <View style={styles.datePickerContent}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={COLORS.textSecondary}
+                    style={styles.datePickerIcon}
+                  />
+                  <Text style={styles.datePickerText}>
+                    {startDate || "Select date"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {showStartDatePicker && (
+                <View style={styles.datePickerContainer}>
+                  {Platform.OS === "ios" ? (
+                    <>
+                      <View style={styles.datePickerHeader}>
+                        <Text style={styles.datePickerHeaderText}>
+                          Select Start Date
+                        </Text>
+                      </View>
+                      <View style={styles.datePickerWrapper}>
+                        <DateTimePicker
+                          value={startDateObj}
+                          mode="date"
+                          display="spinner"
+                          onChange={handleStartDateChange}
+                          maximumDate={endDateObj}
+                          textColor={COLORS.text}
+                          themeVariant="light"
+                          style={styles.datePicker}
+                          locale="en_US"
+                        />
+                      </View>
+                      <View style={styles.iosPickerButtons}>
+                        <TouchableOpacity
+                          onPress={() => setShowStartDatePicker(false)}
+                          style={styles.iosPickerButton}
+                        >
+                          <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleStartDateDone}
+                          style={[
+                            styles.iosPickerButton,
+                            styles.iosPickerButtonPrimary,
+                          ]}
+                        >
+                          <Text style={styles.iosPickerButtonTextPrimary}>
+                            Done
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <DateTimePicker
+                      value={startDateObj}
+                      mode="date"
+                      display="default"
+                      onChange={handleStartDateChange}
+                      maximumDate={endDateObj}
+                    />
+                  )}
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>End Date</Text>
+              <TouchableOpacity
+                onPress={() => setShowEndDatePicker(true)}
+                style={styles.datePickerButton}
+              >
+                <View style={styles.datePickerContent}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={COLORS.textSecondary}
+                    style={styles.datePickerIcon}
+                  />
+                  <Text style={styles.datePickerText}>
+                    {endDate || "Select date"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {showEndDatePicker && (
+                <View style={styles.datePickerContainer}>
+                  {Platform.OS === "ios" ? (
+                    <>
+                      <View style={styles.datePickerHeader}>
+                        <Text style={styles.datePickerHeaderText}>
+                          Select End Date
+                        </Text>
+                      </View>
+                      <View style={styles.datePickerWrapper}>
+                        <DateTimePicker
+                          value={endDateObj}
+                          mode="date"
+                          display="spinner"
+                          onChange={handleEndDateChange}
+                          minimumDate={startDateObj}
+                          textColor={COLORS.text}
+                          themeVariant="light"
+                          style={styles.datePicker}
+                          locale="en_US"
+                        />
+                      </View>
+                      <View style={styles.iosPickerButtons}>
+                        <TouchableOpacity
+                          onPress={() => setShowEndDatePicker(false)}
+                          style={styles.iosPickerButton}
+                        >
+                          <Text style={styles.iosPickerButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleEndDateDone}
+                          style={[
+                            styles.iosPickerButton,
+                            styles.iosPickerButtonPrimary,
+                          ]}
+                        >
+                          <Text style={styles.iosPickerButtonTextPrimary}>
+                            Done
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <DateTimePicker
+                      value={endDateObj}
+                      mode="date"
+                      display="default"
+                      onChange={handleEndDateChange}
+                      minimumDate={startDateObj}
+                    />
+                  )}
+                </View>
+              )}
+            </ScrollView>
             <View style={styles.modalButtons}>
               <GlassButton
                 title="Cancel"
@@ -518,7 +673,7 @@ export const BillingReportScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
-          </GlassCard>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -544,20 +699,33 @@ const styles = StyleSheet.create({
   filterActions: {
     gap: SPACING.md,
   },
-  customerSelector: {
+  customerDropdown: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  customerDropdownContent: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surfaceVariant,
-    borderRadius: 8,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     gap: SPACING.sm,
   },
-  customerSelectorText: {
+  customerDropdownText: {
     ...TYPOGRAPHY.bodyMedium,
     color: COLORS.text,
     flex: 1,
+  },
+  customerListContainer: {
+    maxHeight: 200,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.surfaceVariant,
+    borderRadius: 8,
+    padding: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   filterButton: {
     paddingHorizontal: SPACING.md,
@@ -580,6 +748,92 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  summaryRowLast: {
+    borderBottomWidth: 0,
+  },
+  totalAmount: {
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  pricingCard: {
+    marginBottom: SPACING.lg,
+  },
+  pricingItem: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  pricingHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: SPACING.sm,
+  },
+  pricingInfo: {
+    flex: 1,
+  },
+  pricingTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  pricingRate: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  milkTypeBadge: {
+    backgroundColor: COLORS.primary + "20",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs / 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  milkTypeBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.primary,
+    fontWeight: "600",
+    fontSize: 10,
+  },
+  pricingSubtext: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+  pricingPeriod: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+  pricingAmount: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+  pricingDetails: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  pricingDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: SPACING.xs,
+  },
+  pricingDetailLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+  },
+  pricingDetailValue: {
+    ...TYPOGRAPHY.labelSmall,
     color: COLORS.text,
     fontWeight: "600",
   },
@@ -649,7 +903,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
     padding: SPACING.lg,
@@ -657,8 +911,26 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 400,
-    maxHeight: "80%",
+    maxHeight: "85%",
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
     padding: SPACING.xl,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalScrollContent: {
+    paddingBottom: SPACING.md,
   },
   modalHeader: {
     flexDirection: "row",
@@ -737,5 +1009,93 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  datePickerButton: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  datePickerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerIcon: {
+    marginRight: SPACING.sm,
+  },
+  datePickerText: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.text,
+    flex: 1,
+  },
+  datePickerContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    width: "100%",
+  },
+  datePickerHeader: {
+    backgroundColor: COLORS.backgroundSecondary,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerHeaderText: {
+    ...TYPOGRAPHY.titleMedium,
+    color: COLORS.text,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  datePickerWrapper: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 180,
+    maxHeight: 200,
+  },
+  datePicker: {
+    width: "95%",
+    height: 180,
+    transform: [{ scale: 0.9 }],
+  },
+  iosPickerButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.backgroundSecondary,
+  },
+  iosPickerButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  iosPickerButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  iosPickerButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  iosPickerButtonTextPrimary: {
+    ...TYPOGRAPHY.labelLarge,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

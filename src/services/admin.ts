@@ -56,7 +56,7 @@ export const adminService = {
 
   // Get all customers
   getAllCustomers: async (): Promise<AllCustomersResponse> => {
-    const response = await api.get("/admin/allcustomers");
+    const response = await api.get("/admin/allcustomers/");
     return response.data;
   },
 

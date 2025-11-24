@@ -121,7 +121,11 @@ export interface BillingReport {
   summary: {
     total_delivered_days: number;
     total_delivered_liters: number;
+    total_amount: number;
   };
+  total_days_delivered: number;
+  total_liters_delivered: number;
+  total_amount: number;
   rate_breakdown: DetailedRateBreakdown[];
   deliveries?: BillingDelivery[];
 }
@@ -147,6 +151,9 @@ export interface DetailedRateBreakdown {
   effective_from: string;
   effective_to: string | null;
   period_start: string;
+  days_delivered: number;
+  total_liters: number;
+  pricing?: PricingDetails | null;
   period_end: string;
   expected_delivery_days: number;
   actual_delivery_days: number;
