@@ -74,6 +74,62 @@ export const BillingHistoryScreen: React.FC = () => {
     loadBillingHistory();
   };
 
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowStartDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const end = new Date(endDateObj);
+      end.setHours(0, 0, 0, 0);
+
+      if (selected > end) {
+        Alert.alert(
+          "Invalid Date",
+          "Start date cannot be after end date. Please select an earlier date."
+        );
+        return;
+      }
+
+      setStartDateObj(selectedDate);
+      setStartDate(selectedDate.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleStartDateDone = () => {
+    setShowStartDatePicker(false);
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowEndDatePicker(false);
+    }
+
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      const start = new Date(startDateObj);
+      start.setHours(0, 0, 0, 0);
+
+      if (selected < start) {
+        Alert.alert(
+          "Invalid Date",
+          "End date cannot be before start date. Please select a later date."
+        );
+        return;
+      }
+
+      setEndDateObj(selectedDate);
+      setEndDate(selectedDate.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleEndDateDone = () => {
+    setShowEndDatePicker(false);
+  };
+
   const handleDateRangeChange = () => {
     setShowDateRangeModal(false);
     setLoading(true);
@@ -156,16 +212,28 @@ export const BillingHistoryScreen: React.FC = () => {
               <View key={breakdown.rate_id || index} style={styles.pricingItem}>
                 <View style={styles.pricingHeader}>
                   <View style={styles.pricingInfo}>
-                    <Text style={styles.pricingRate}>
-                      {formatLiters(pricing.liters)}/day @ ₹
+                    <View style={styles.pricingTitleRow}>
+                      <Text style={styles.pricingRate}>
+                        {formatLiters(pricing.daily_liters)}/day
+                      </Text>
+                      <View style={styles.milkTypeBadge}>
+                        <Text style={styles.milkTypeBadgeText}>
+                          {pricing.milk_type === "buffalo" ? "Buffalo" : "Cow"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.pricingSubtext}>
+                      ₹{pricing.price_per_liter}/L × {pricing.daily_liters}L = ₹
                       {pricing.price_per_day}/day
                     </Text>
-                    <Text style={styles.pricingPeriod}>
-                      {formatDate(pricing.pricing_effective_from)} -{" "}
-                      {pricing.pricing_effective_to
-                        ? formatDate(pricing.pricing_effective_to)
-                        : "Present"}
-                    </Text>
+                    {breakdown.effective_from && (
+                      <Text style={styles.pricingPeriod}>
+                        {formatDate(breakdown.effective_from)} -{" "}
+                        {breakdown.effective_to
+                          ? formatDate(breakdown.effective_to)
+                          : "Present"}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.pricingAmount}>
                     ₹{pricing.total_amount.toFixed(2)}
@@ -179,7 +247,13 @@ export const BillingHistoryScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={styles.pricingDetailRow}>
-                    <Text style={styles.pricingDetailLabel}>Rate:</Text>
+                    <Text style={styles.pricingDetailLabel}>Price/Liter:</Text>
+                    <Text style={styles.pricingDetailValue}>
+                      ₹{pricing.price_per_liter}
+                    </Text>
+                  </View>
+                  <View style={styles.pricingDetailRow}>
+                    <Text style={styles.pricingDetailLabel}>Daily Rate:</Text>
                     <Text style={styles.pricingDetailValue}>
                       ₹{pricing.price_per_day}/day
                     </Text>
@@ -235,7 +309,7 @@ export const BillingHistoryScreen: React.FC = () => {
         onRequestClose={() => setShowDateRangeModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <GlassCard style={styles.modalContent}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Date Range</Text>
 
             <Text style={styles.inputLabel}>Start Date</Text>
@@ -393,7 +467,7 @@ export const BillingHistoryScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
-          </GlassCard>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -468,10 +542,35 @@ const styles = StyleSheet.create({
   pricingInfo: {
     flex: 1,
   },
+  pricingTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
   pricingRate: {
     ...TYPOGRAPHY.bodyMedium,
     color: COLORS.text,
     fontWeight: "600",
+  },
+  milkTypeBadge: {
+    backgroundColor: COLORS.primary + "20",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs / 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  milkTypeBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.primary,
+    fontWeight: "600",
+    fontSize: 10,
+  },
+  pricingSubtext: {
+    ...TYPOGRAPHY.labelSmall,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
   },
   pricingPeriod: {
     ...TYPOGRAPHY.labelSmall,
@@ -535,7 +634,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
     padding: SPACING.lg,
@@ -543,7 +642,19 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 400,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
     padding: SPACING.xl,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   modalTitle: {
     ...TYPOGRAPHY.titleLarge,

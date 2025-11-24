@@ -68,10 +68,12 @@ export interface RateBreakdown {
 }
 
 export interface PricingDetails {
-  liters: string;
+  milk_type: "buffalo" | "cow";
+  price_per_liter: string;
+  daily_liters: string;
   price_per_day: string;
-  pricing_effective_from: string;
-  pricing_effective_to: string | null;
+  pricing_effective_from?: string;
+  pricing_effective_to?: string | null;
   days_count: number;
   total_amount: number;
 }
