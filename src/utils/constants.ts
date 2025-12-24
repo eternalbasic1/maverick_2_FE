@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.6:8000/api",
+  BASE_URL: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.2:8000/api",
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
 };

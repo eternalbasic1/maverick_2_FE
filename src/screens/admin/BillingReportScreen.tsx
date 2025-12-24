@@ -471,11 +471,16 @@ export const BillingReportScreen: React.FC = () => {
               </TouchableOpacity>
               {showCustomerList && (
                 <View style={styles.customerListContainer}>
-                  <FlatList
-                    data={customers}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
+                  {customers.length === 0 ? (
+                    <View style={styles.emptyList}>
+                      <Text style={styles.emptyListText}>
+                        No customers found
+                      </Text>
+                    </View>
+                  ) : (
+                    customers.map((item) => (
                       <TouchableOpacity
+                        key={item.id}
                         style={[
                           styles.customerItem,
                           selectedCustomer?.id === item.id &&
@@ -502,21 +507,10 @@ export const BillingReportScreen: React.FC = () => {
                           />
                         )}
                       </TouchableOpacity>
-                    )}
-                    style={styles.customerList}
-                    nestedScrollEnabled={true}
-                    ListEmptyComponent={
-                      <View style={styles.emptyList}>
-                        <Text style={styles.emptyListText}>
-                          No customers found
-                        </Text>
-                      </View>
-                    }
-                  />
+                    ))
+                  )}
                 </View>
               )}
-
-              <Text style={styles.inputLabel}>Start Date</Text>
 
               <Text style={styles.inputLabel}>Start Date</Text>
               <TouchableOpacity
@@ -718,12 +712,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customerListContainer: {
-    maxHeight: 200,
+    maxHeight: 250,
     marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
     backgroundColor: COLORS.surfaceVariant,
     borderRadius: 8,
-    padding: SPACING.xs,
+    padding: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -955,7 +949,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: SPACING.md,
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: COLORS.surface,
     borderRadius: 8,
     marginBottom: SPACING.sm,
     borderWidth: 1,
